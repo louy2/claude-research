@@ -27,40 +27,49 @@ opf eval work/eval_300k_val_500.jsonl --device cpu --eval-mode untyped \
 
 ## Results
 
-### Smoke test (n=20, ai4privacy/pii-masking-300k validation, English)
+### n=200, ai4privacy/pii-masking-300k validation, English
 
-CPU eval, viterbi decode, default operating point, ~13 tokens/sec on this box.
+CPU eval (no GPU available), viterbi decode, default operating point.
+Throughput ~13.3 tokens/sec; 200 examples / 23.5k tokens took 29 min.
+Full metrics in `work/metrics_n200.json`, predictions in
+`work/predictions_n200.jsonl` (both gitignored).
 
-| metric                  | value |
-| ----------------------- | ----- |
-| detection.span.f1       | 0.895 |
-| detection.span.precision | 0.963 |
-| detection.span.recall   | 0.835 |
-| detection.f1 (token)    | 0.956 |
-| token_accuracy          | 0.785 |
+| metric                   | value |
+| ------------------------ | ----- |
+| detection.f1 (token)     | 0.923 |
+| detection.precision      | 0.938 |
+| detection.recall         | 0.909 |
+| detection.span.f1        | 0.847 |
+| detection.span.precision | 0.912 |
+| detection.span.recall    | 0.791 |
 
 **`ground_truth_label_recall` (char-level recall per source label)**
 
-100% recalled: `BOD`, `BUILDING`, `CITY`, `DATE`, `DRIVERLICENSE`, `EMAIL`,
-`GIVENNAME1`, `IDCARD`, `IP`, `LASTNAME1`, `LASTNAME2`, `LASTNAME3`, `PASS`,
-`PASSPORT`, `POSTCODE`, `SECADDRESS`, `SOCIALNUMBER`, `STREET`, `TEL`.
-~99% recalled: `USERNAME`.
-~0% recalled: `COUNTRY`, `SEX`, `STATE`, `TIME` (6.5%).
+| recall band | source labels |
+| ----------- | ------------- |
+| 1.000       | BOD, DRIVERLICENSE, EMAIL, GEOCOORD, GIVENNAME2, IP, LASTNAME1, LASTNAME2, LASTNAME3, PASS, PASSPORT, POSTCODE, SECADDRESS, SOCIALNUMBER, STREET |
+| 0.96–0.99   | BUILDING (0.974), CITY (0.987), DATE (0.964), GIVENNAME1 (0.987), TEL (0.995), USERNAME (0.989) |
+| 0.81–0.83   | IDCARD (0.829), TITLE (0.812) |
+| ≤ 0.14      | COUNTRY (0.000), STATE (0.000), SEX (0.141), TIME (0.085) |
 
-The four near-zero categories aren't model misses so much as a taxonomy
-mismatch: OPF's training policy "aims to prioritize personal identifiers,
-often preserving context that is not strongly person-linked" (see README §
-Limitation: Static Label Policy). A bare country/state/sex/time word in
-isolation is not a personal identifier under OPF's taxonomy. They drag
-untyped span F1 down by ~5-6 points.
+The bottom band isn't model misses so much as a taxonomy mismatch: OPF's
+training policy "aims to prioritize personal identifiers, often preserving
+context that is not strongly person-linked" (see README § Limitation:
+Static Label Policy). A bare country / state / sex / time word in
+isolation is not a personal identifier under OPF's 8-category taxonomy.
+These four labels alone account for ~1.46k ground-truth chars out of
+~14.6k total (≈10%), so they pull span recall down by roughly that
+fraction.
 
-**Per-class span precision (predicted OPF labels with ≥1 hit)**
+If those four labels are excluded, the recoverable span recall on the
+remaining "personal-identifier-shaped" labels is ~0.88+ — closer to the
+F1=0.96 OpenAI reports in their model card, which is reassuring given the
+floor difference (their number is `--eval-mode typed` against an OPF-label
+held-out split, ours is `untyped` against a different taxonomy).
 
-`private_address`, `private_person`, `private_phone`, `private_url`: 1.000;
-`account_number`: 0.983; `private_date`: 0.917; `private_email`: 0.778;
-`secret`: 0.000 (no `secret` ground-truth in this sample, all preds were FP).
-
-n=200 run pending (results in `work/metrics_n200.json` once finished).
+OPF eval did not surface `GEOCOORD` or `TITLE` in the n=20 sample because
+those labels weren't present in the first 20 examples. The n=200 sample
+adds them at full and 81% recall respectively.
 
 ## Dataset choices
 
