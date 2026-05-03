@@ -14,6 +14,7 @@ session restart before `pip`/`hf_hub_download` can reach the host.
 
 ```bash
 # 1. Install (already done in this workspace)
+# From this research directory (openai-privacy-filter/):
 git clone --depth 1 https://github.com/openai/privacy-filter.git work/privacy-filter
 pip install --break-system-packages torch
 pip install --break-system-packages huggingface_hub safetensors tiktoken datasets
