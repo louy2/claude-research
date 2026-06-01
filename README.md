@@ -133,11 +133,39 @@ redistributable. Then:
 > wcdemo.exe wordfreq sample.txt
 ```
 
-> **Note:** the binary could not be executed *in this Linux sandbox*: Wine 9.0
-> aborts at startup (`free(): invalid pointer`) — a Wine/glibc-in-container bug
-> that fires before the program is even loaded, unrelated to the binary itself.
-> Verification here is therefore via `file` + import-table inspection; running
-> needs a real Windows host (or a working Wine).
+### Verified by actually running it (under Wine)
+
+The binary was executed on the Linux host via **Wine 8.0.2** (with the `rtl`
+runtime DLLs alongside it) and behaves correctly:
+
+```
+$ wine64 wcdemo.exe info
+wcdemo 1.0.0
+Compiled for : Windows (x86_64)
+Path sep     : '\'
+Running on   : Windows 7 (build 7601)
+CPU cores    : 4
+
+$ wine64 wcdemo.exe fib 90
+2880067194370816120
+
+$ wine64 wcdemo.exe wordfreq --top 3 sample.txt
+Total words: 11
+Unique words: 6
+Top 3:
+   1. the 5
+   2. fox 2
+   3. brown 1
+
+$ wine64 wcdemo.exe checksum sample.txt
+ef44d26e5be6c069  sample.txt
+```
+
+> **Wine version note:** the distro's **Wine 9.0** (new single-binary WoW64
+> build) aborts at startup with `free(): invalid pointer` in this container —
+> before the program is even loaded, unrelated to the binary. The classic
+> split-arch **Wine 8.0.2** (e.g. a Kron4ek `wine-8.0.2-amd64` build, run via
+> `wine64`) loads and runs it fine.
 
 ---
 
