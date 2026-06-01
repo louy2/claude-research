@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+*.o
+*.obj
+*.exe
+*.pdb
+DerivedData/
+Package.resolved
