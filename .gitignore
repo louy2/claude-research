@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# Raw PWT workbook is re-downloaded by src/fetch.py (5.8 MB); not tracked.
+data/raw/
