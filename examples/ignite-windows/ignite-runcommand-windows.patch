@@ -1,0 +1,24 @@
+diff --git a/Sources/IgniteCLI/RunCommand.swift b/Sources/IgniteCLI/RunCommand.swift
+index d750ebc..6e64782 100644
+--- a/Sources/IgniteCLI/RunCommand.swift
++++ b/Sources/IgniteCLI/RunCommand.swift
+@@ -109,6 +109,11 @@ struct RunCommand: ParsableCommand {
+ 
+     /// Returns the local IP address of the machine.
+     private func getLocalIPAddress() -> String? {
++        #if os(Windows)
++        // getifaddrs/getnameinfo are POSIX; this helper is only ever called from
++        // the CoreImage-guarded QR path (Apple only), so nil is fine on Windows.
++        return nil
++        #else
+         var localIPAddress: String?
+         var interfaceAddressPointer: UnsafeMutablePointer<ifaddrs>?
+ 
+@@ -142,6 +147,7 @@ struct RunCommand: ParsableCommand {
+         }
+ 
+         return localIPAddress
++        #endif
+     }
+ 
+     /// Identify subsite by looking at the canonical url of 

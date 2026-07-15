@@ -94,9 +94,12 @@ A clean cross-build does **not** happen out of the box. The obstacles, in order:
    for a newer split-header SDK) references `corecrt_math.h`, `stdalign.h` and
    `stdnoreturn.h`, which don't exist in that header set. Fix:
    - `stdalign.h` / `stdnoreturn.h` → copy from clang's builtin headers;
-   - `corecrt_math.h` → empty placeholder (the math decls already live in
-     `<math.h>`; an `#include <math.h>` here instead creates a
-     `corecrt ↔ ucrt` **module cycle**).
+   - `corecrt_math.h` → move the real math declarations from `<math.h>` into it
+     and forward `math.h` to it. (The prebuilt Windows `Foundation` module pins
+     C math like `pow` to the `corecrt` module, so the declarations must live in
+     `corecrt_math.h`, matching the newer split-header layout Foundation was
+     built against. An empty stub compiles a bare CLI but breaks Foundation-heavy
+     packages; see the Ignite notes below.)
 
 4. **Modern MSVC CRT (14.44) headers vs legacy UCRT.** `xwin` pairs a current
    VC runtime with the old UCRT, so headers like `threads.h` reference UCRT
@@ -168,6 +171,16 @@ ef44d26e5be6c069  sample.txt
 > `wine64`) loads and runs it fine.
 
 ---
+
+## Real-world validation: Ignite
+
+The same SDK cross-compiles a real third-party package —
+[Ignite](https://github.com/twostraws/Ignite), a static-site generator with a C
+dependency (cmark-gfm) and four SwiftPM dependencies — into a working
+`IgniteCLI.exe` that runs under Wine. See
+[`examples/ignite-windows/`](examples/ignite-windows/README.md) for the extra
+gotchas it surfaced (manifest-host `#if os(Windows)`, the Foundation `pow`
+module pinning, POSIX `getifaddrs`).
 
 ## Layout
 

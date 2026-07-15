@@ -90,10 +90,13 @@ cp "$SHARE/winsdk_shared.modulemap" "$XWIN/sdk/include/shared/module.modulemap"
 CB="$(ls -d "$TC"/usr/lib/clang/*/include | head -1)"
 cp "$CB/stdalign.h"    "$XWIN/sdk/include/ucrt/stdalign.h"      # clang builtin
 cp "$CB/stdnoreturn.h" "$XWIN/sdk/include/ucrt/stdnoreturn.h"   # clang builtin
-# corecrt_math.h: math decls live directly in <math.h> in this UCRT, and nothing
-# but the modulemap references this file, so an empty placeholder satisfies the
-# module without creating a corecrt<->ucrt include cycle.
-printf '#pragma once\n' > "$XWIN/sdk/include/ucrt/corecrt_math.h"
+# corecrt_math.h: this legacy UCRT ships the math declarations directly in
+# <math.h>, but the prebuilt Windows Foundation module pins C math (pow, ...) to
+# the 'corecrt' module (newer SDKs split the decls into corecrt_math.h). So move
+# the real declarations into corecrt_math.h and make math.h forward to it — this
+# keeps 'pow' in 'corecrt' (required by Foundation) with no corecrt<->ucrt cycle.
+cp "$XWIN/sdk/include/ucrt/math.h" "$XWIN/sdk/include/ucrt/corecrt_math.h"
+printf '#pragma once\n#include <corecrt_math.h>\n' > "$XWIN/sdk/include/ucrt/math.h"
 
 # Exact-case symlinks for um headers/libs the autolink directives request but
 # xwin only provided under other casings:
