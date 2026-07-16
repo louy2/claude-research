@@ -579,3 +579,210 @@ Phoenix Channels. If you want LiveView's diff model without leaving Gleam,
 Loom is where to look; if you want the full LiveView protocol, Elixir's
 `lissome` package still wins by hosting a Lustre app inside a real
 Phoenix.LiveView.
+
+---
+
+## Appendix: Sprocket
+
+Sprocket (`bitbldr/sprocket`) is the older LiveView-inspired Gleam framework.
+Its user experience is unmistakably LiveView-shaped — server-side state, WS,
+no JS required for interactivity — but under the hood its protocol is
+closer to a *React reconciler* than to LiveView's template diff. It borrows
+heavily from React (useState/useEffect-style hooks) and uses **Snabbdom** as
+its client-side patcher.
+
+### State shape: a reconciled element tree, not a template
+
+Sprocket's server holds a `ReconciledElement` tree
+(`src/sprocket/internal/reconcile.gleam:15-34`):
+
+```gleam
+pub type ReconciledElement {
+  ReconciledElement(
+    id: Unique(ElementId),                  // stable identity
+    tag: String,
+    key: Option(String),
+    attrs: List(ReconciledAttribute),
+    children: List(ReconciledElement),
+  )
+  ReconciledComponent(fc, key, props, hooks, el)
+  ReconciledFragment(key, children)
+  ReconciledIgnoreUpdate(el)
+  ReconciledText(text)
+  ReconciledCustom(kind, data)
+}
+
+pub type ReconciledAttribute {
+  ReconciledAttribute(name, value)
+  ReconciledEventHandler(element_id: Unique(ElementId), kind: String)
+  ReconciledClientHook(name)
+}
+```
+
+There are no statics/dynamics; the full tree of elements, attributes, and
+event-handler bindings is materialized in memory. Reconciliation is done by
+the recursive reconciler in `src/sprocket/internal/reconcilers/recursive`
+and each element gets a stable `Unique(ElementId)` used for both diff
+identity and event routing.
+
+### Wire format: numeric opcode patches (like Lustre, not like LiveView)
+
+The diff type (`src/sprocket/internal/patch.gleam:19-30`):
+
+```gleam
+pub type Patch {
+  NoOp
+  Update(attrs: Option(List(ReconciledAttribute)),
+         children: Option(List(#(Int, Patch))))
+  Replace(el: ReconciledElement)
+  Insert(el: ReconciledElement)
+  Remove
+  Change(text: String)
+  Move(from: Int, patch: Patch)
+}
+```
+
+Encoded as compact JSON arrays with a string-encoded opcode 0–6
+(`patch.gleam:424-484`):
+
+```json
+["1", {"class":"active"}, {"0":["5","new text"]}]   // Update
+["2", {"type":"element","tag":"span","id":"e42",...}]// Replace
+["5", "hello"]                                       // Change (text)
+["6", 3, ["1", null, null]]                          // Move (from index 3)
+```
+
+Diff identity works by comparing the element `id`: same `id` and same `tag`
+→ recurse into attrs/children; anything else → `Replace`
+(`patch.gleam:67-95`). That's structurally similar to Lustre's opcode-list
+approach, not to LiveView's slot-map approach.
+
+### Initial payload: full serialized reconciled tree
+
+For the first render, Sprocket sends the *entire* reconciled tree as JSON
+(`src/sprocket/renderers/json.gleam:37-92`):
+
+```json
+{"type":"element","id":"e1","tag":"div",
+ "attrs":{"class":"counter"},
+ "events":[{"kind":"click","id":"e2"}],
+ "hooks":[],
+ "0":{"type":"element","id":"e3","tag":"button",
+      "attrs":{}, "events":[{"kind":"click","id":"e4"}], "hooks":[],
+      "0":"Increment"},
+ "1":"1"}
+```
+
+Children are keyed by their integer index as string properties on the same
+object (`"0"`, `"1"`, …). Event handlers become `events: [{kind, id}]`
+entries; client hooks (custom JS lifecycle) become `hooks: [{name}]`. There
+is no static-string reuse across renders — the whole tree ships each time
+the connection reconnects.
+
+### Transport and message tags
+
+Client uses `ReconnectingWebSocket` (a third-party JS lib) and Snabbdom as
+the patcher (`client/src/sprocket.ts:1-9`). No Phoenix Channels.
+
+**Client → server** (`src/sprocket/json.gleam:16-49`,
+`client/src/sprocket.ts:57-93`):
+
+```json
+["join",  {"csrf": "...", "initialProps": {...}}]
+["event", {"id": "e42", "kind": "click", "payload": {...}}]
+["hook",  {"id": "e42", "hook": "MyHook", "kind": "mounted", "payload": {...}}]
+```
+
+Event `payload` is inferred from the DOM event class on the client
+(`client/src/events.ts:33-70`) — `InputEvent`/`PointerEvent` sends
+`{target:{value}}`, `MouseEvent` sends coords + modifier keys, `KeyboardEvent`
+sends `key`/`code` + modifiers — plus per-event custom encoders you can
+register.
+
+**Server → client** (`src/sprocket/json.gleam:52-89`,
+`client/src/sprocket.ts:96-145`):
+
+```json
+["ok",     <full serialized reconciled element tree>]  // initial or reconnect
+["update", <patch>]                                    // subsequent renders
+["hook",   {"id","hook","kind","payload"}]             // outbound client-hook event
+["error",  {"code","msg"}]
+```
+
+Only two of these represent server-authored view updates: `"ok"` for a full
+reconciliation (used on first connect and on reconnect after the server has
+lost state), and `"update"` for opcode patches. Sprocket does not have a
+LiveView-style `live_patch` for URL changes or a dedicated redirect message
+in the runtime.
+
+### Server-side loop
+
+The runtime is an OTP actor with a `RenderUpdate` message
+(`src/sprocket/runtime.gleam:264-301`):
+
+```gleam
+RenderUpdate -> {
+  let #(ctx, reconciled) = do_reconciliation(state.ctx, el, prev_reconciled)
+  case prev_reconciled {
+    Some(prev) -> {
+      let update = patch.create(prev, reconciled)
+      use <- bool.guard(update == patch.NoOp, Nil)
+      dispatch(PatchUpdate(update))
+    }
+    None -> dispatch(FullUpdate(reconciled))  // first render only
+  }
+  ...
+}
+```
+
+Events flow the other way: the WS handler decodes a `["event", {id,kind}]`
+and sends `ProcessClientMessage(element_id, kind, payload)` to the runtime
+(`runtime.gleam:120-140`), which looks up the handler bound to that element
+id/kind and calls it. If the handler mutates a hook (e.g. a `Reducer`), the
+hook triggers a `RenderUpdate` and the cycle repeats.
+
+### Where Sprocket sits in the taxonomy
+
+| Feature                              | LiveView          | Loom (Glimr)              | Sprocket                    | Lustre server component      |
+|--------------------------------------|-------------------|---------------------------|-----------------------------|------------------------------|
+| Programming model                    | assigns + HEEx    | props + Loom templates    | React-style hooks + fn comp | Elm-style update/view + vdom |
+| State shape on server                | `%Rendered{}`     | `LiveTree{s,d}`           | `ReconciledElement` tree    | vdom tree + cache            |
+| Diff unit                            | template slot     | template slot             | opcode against element tree | opcode against DOM path      |
+| Wire encoding                        | `{s:[..], d:{..}}`| `{s:[..], d:{..}}`        | `["1", attrs, children]`    | `{path,changes,children}`    |
+| Static-string reuse                  | yes               | yes (per template)        | **no**                      | no (VDOM identity via Memo)  |
+| Identity for diff                    | fingerprint hash  | statics-list equality     | stable `ElementId` + tag    | position in vdom + key       |
+| First paint                          | dead render       | not in what I read        | none; waits for `"ok"` msg  | none; waits for `Mount` msg  |
+| On reconnect                         | rejoin channel    | rejoin (fresh actor)      | server resends full tree    | server resends full vdom     |
+| Transport                            | Phoenix Channel   | raw mist WS + own frames  | `ReconnectingWebSocket`     | WS / SSE / polling           |
+| Client patcher                       | morphdom + slot   | (browser applies index    | **Snabbdom** (vdom)         | custom vdom reconciler       |
+|                                      |  reassembly       |  diff into JS object)     |                             |                              |
+| Client hooks / custom JS             | `phx-hook`        | (none in what I read)     | `spkt-hook`                 | custom-element context       |
+
+### Bottom line
+
+Sprocket looks like LiveView from the *outside* — you write server-rendered
+Gleam components and get a WS-backed interactive UI — but its protocol is
+much closer to Lustre's. Both ship opcode patches against a structured tree
+on the client; the difference is that Lustre's tree is a plain VDOM patched
+by its own reconciler, while Sprocket's tree is a React-style reconciled
+element tree patched into Snabbdom. Neither reuses statics or dedupes
+templates the way LiveView does.
+
+The two design axes come out roughly like this:
+
+```
+    diff unit
+       │
+  template ┼──────── Loom (Glimr)  ─── LiveView (Phoenix)
+       │
+  DOM/vdom ┼── Sprocket ───────────────── Lustre
+       │
+       └────────────────────────────────────
+         React-style           Elm-style
+         (fn comps + hooks)    (update/view)
+                          programming model
+```
+
+Loom is closest to LiveView on both axes; Sprocket is closest to LiveView on
+programming model but not protocol; Lustre is closest to LiveView on
+transport flexibility but sits at the opposite corner on both other axes.
