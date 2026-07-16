@@ -1,0 +1,241 @@
+diff --git a/Sources/IgniteCLI/NewCommand.swift b/Sources/IgniteCLI/NewCommand.swift
+index d58faf5..eb39119 100644
+--- a/Sources/IgniteCLI/NewCommand.swift
++++ b/Sources/IgniteCLI/NewCommand.swift
+@@ -40,17 +40,28 @@ struct NewCommand: ParsableCommand {
+         print("⚙️  Creating a new Ignite site in '\(name)'...")
+         let result = try Process.execute(command: "git clone \(template) \(name)")
+ 
+-        if result.error.contains("fatal") {
++        // Treat the clone as successful only if it produced a populated site
++        // directory. Scanning stderr for the word "fatal" is brittle: a missing
++        // or differently-localised git emits other wording (e.g. Windows'
++        // "'git' is not recognized"), which would otherwise be reported as a
++        // false success.
++        let clonedPackage = URL(fileURLWithPath: name).appendingPathComponent("Package.swift")
++        guard FileManager.default.fileExists(atPath: clonedPackage.path) else {
+             print("❌ Failed to create a new site. See errors below:")
+-            print(result.error)
+-        } else {
+-            // If everything worked, remove the Git history
+-            // for the IgniteStarter repo to avoid confusion.
+-            try Process.execute(command: "rm -rf \(name)/.git")
+-            print("✅ Success!")
+-
+-            print("\nRun the following commands to edit your site in Xcode:\n\tcd \(name)\n\topen Package.swift\n")
+-            print("Tip: If you want to build with Xcode, go to the Product menu and choose Destination > My Mac.\n")
++            print(result.error.isEmpty
++                ? "Could not run 'git clone'. Is git installed and on your PATH?"
++                : result.error)
++            return
+         }
++
++        // If everything worked, remove the Git history for the IgniteStarter
++        // repo to avoid confusion. Use FileManager rather than `rm -rf` so this
++        // works on every platform.
++        let gitDirectory = URL(fileURLWithPath: name).appendingPathComponent(".git")
++        try? FileManager.default.removeItem(at: gitDirectory)
++        print("✅ Success!")
++
++        print("\nRun the following commands to edit your site:\n\tcd \(name)\n\tignite run\n")
++        print("Tip: open Package.swift in Xcode (macOS) or your preferred Swift editor to start building.\n")
+     }
+ }
+diff --git a/Sources/IgniteCLI/Process-Execute.swift b/Sources/IgniteCLI/Process-Execute.swift
+index 17e0ae5..f958c45 100644
+--- a/Sources/IgniteCLI/Process-Execute.swift
++++ b/Sources/IgniteCLI/Process-Execute.swift
+@@ -12,9 +12,9 @@ import Foundation
+ /// to execute a subsequent command while the first one is
+ /// running, which is important for previewing on a local server.
+ ///
+-/// Important: This runs all commands through `/bin/bash -c`,
+-/// which allows us to `kill` a specific process ID belonging
+-/// to the user.
++/// Important: This runs all commands through the platform shell
++/// (`/bin/bash -c` on Unix, `cmd.exe /c` on Windows), which allows
++/// us to `kill` a specific process ID belonging to the user.
+ extension Process {
+     /// Runs a command, optionally followed by a second command.
+     /// - Parameters:
+@@ -31,8 +31,17 @@ extension Process {
+         then subsequentCommand: String = ""
+     ) throws -> (output: String, error: String) {
+         let process = Process()
++        #if os(Windows)
++        // Windows has no /bin/bash; route through the command interpreter
++        // (ComSpec, normally cmd.exe) with its `/c` switch.
++        let shell = ProcessInfo.processInfo.environment["ComSpec"]
++            ?? #"C:\Windows\System32\cmd.exe"#
++        process.executableURL = URL(fileURLWithPath: shell)
++        process.arguments = ["/c", command]
++        #else
+         process.executableURL = URL(fileURLWithPath: "/bin/bash")
+-        process.arguments = ["-c"] + [command]
++        process.arguments = ["-c", command]
++        #endif
+ 
+         let output = Pipe()
+         let error = Pipe()
+diff --git a/Sources/IgniteCLI/RunCommand.swift b/Sources/IgniteCLI/RunCommand.swift
+index d750ebc..8055b58 100644
+--- a/Sources/IgniteCLI/RunCommand.swift
++++ b/Sources/IgniteCLI/RunCommand.swift
+@@ -7,6 +7,9 @@
+ 
+ import ArgumentParser
+ import Foundation
++#if canImport(WinSDK)
++import WinSDK
++#endif
+ 
+ /// The command that lets users run their Ignite site
+ /// back in a local web server.
+@@ -42,7 +45,7 @@ struct RunCommand: ParsableCommand {
+ 
+         // Find an available port
+         var currentPort = port
+-        while try isServerRunning(on: currentPort) {
++        while isPortInUse(currentPort) {
+             currentPort += 1
+             if currentPort >= 9000 {
+                 print("❌ No available ports found in range 8000-8999.")
+@@ -54,7 +57,7 @@ struct RunCommand: ParsableCommand {
+             if preview {
+                 // Automatically open a web browser pointing to their
+                 // local server if requested.
+-                "open http://localhost:\(currentPort)\(subsite)"
++                Self.openCommand(for: "http://localhost:\(currentPort)\(subsite)")
+             } else {
+                 // Important: The empty space below is enough to
+                 // make the Process.execute() wait for a key press
+@@ -62,11 +65,11 @@ struct RunCommand: ParsableCommand {
+                 " "
+             }
+ 
+-        // Find the server script installed next to the tool itself
+-        let tool = ProcessInfo.processInfo.arguments.first ?? "NEVER"
+-        let dirLoc = tool.lastIndex(of: "/") ?? tool.endIndex
+-        let toolDir = String(tool[..<dirLoc])
+-        let serverScriptURL = URL(filePath: "\(toolDir)/ignite-server.py")
++        // Find the server script installed next to the tool itself. Use URL
++        // path APIs so this works with Windows `\` separators too.
++        let tool = ProcessInfo.processInfo.arguments.first ?? ""
++        let toolDir = URL(fileURLWithPath: tool).deletingLastPathComponent()
++        let serverScriptURL = toolDir.appendingPathComponent("ignite-server.py")
+ 
+         // Verify server script exists
+         guard FileManager.default.fileExists(atPath: serverScriptURL.path) else {
+@@ -84,15 +87,75 @@ struct RunCommand: ParsableCommand {
+ 
+         let subsiteArgument = subsite.isEmpty ? "" : "-s \(subsite)"
+         try Process.execute(
+-            command: "python3 \(serverScriptURL.path) -d \(directory) \(subsiteArgument) \(currentPort)",
++            command: "\(Self.pythonExecutable) \(serverScriptURL.path) -d \(directory) \(subsiteArgument) \(currentPort)",
+             then: previewCommand
+         )
+     }
+ 
+-    /// Returns true if there is a server running on the specified port.
+-    private func isServerRunning(on port: Int) throws -> Bool {
+-        let result = try Process.execute(command: "lsof -t -i tcp:\(port)")
+-        return !result.output.isEmpty
++    /// The Python 3 launcher for the current platform. The `python3` name is
++    /// standard on Unix, but on Windows the launcher is usually `python`.
++    private static var pythonExecutable: String {
++        #if os(Windows)
++        "python"
++        #else
++        "python3"
++        #endif
++    }
++
++    /// A shell command that opens `url` in the user's default browser, using
++    /// each platform's native opener.
++    private static func openCommand(for url: String) -> String {
++        #if os(macOS)
++        "open \(url)"
++        #elseif os(Windows)
++        // `start` is a cmd.exe builtin; the empty "" is its (ignored) title arg.
++        "start \"\" \(url)"
++        #else
++        "xdg-open \(url)"
++        #endif
++    }
++
++    /// Returns true if something is already listening on `port`. Implemented by
++    /// attempting to bind the port ourselves (portable across Unix and Windows)
++    /// rather than shelling out to `lsof`, which does not exist on Windows.
++    private func isPortInUse(_ port: Int) -> Bool {
++        #if os(Windows)
++        var wsaData = WSADATA()
++        guard WSAStartup(0x0202, &wsaData) == 0 else { return false }
++        defer { WSACleanup() }
++        let handle = socket(AF_INET, SOCK_STREAM, 0)
++        guard handle != INVALID_SOCKET else { return false }
++        defer { closesocket(handle) }
++        var address = sockaddr_in()
++        address.sin_family = ADDRESS_FAMILY(AF_INET)
++        address.sin_port = htons(UInt16(port))
++        // sin_addr is left zero-initialised, i.e. INADDR_ANY.
++        let bindResult = withUnsafePointer(to: &address) {
++            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
++                bind(handle, $0, Int32(MemoryLayout<sockaddr_in>.size))
++            }
++        }
++        return bindResult != 0
++        #else
++        #if canImport(Glibc)
++        let streamType = Int32(SOCK_STREAM.rawValue)
++        #else
++        let streamType = SOCK_STREAM
++        #endif
++        let handle = socket(AF_INET, streamType, 0)
++        guard handle >= 0 else { return false }
++        defer { close(handle) }
++        var address = sockaddr_in()
++        address.sin_family = sa_family_t(AF_INET)
++        address.sin_port = htons(UInt16(port))
++        // sin_addr is left zero-initialised, i.e. INADDR_ANY.
++        let bindResult = withUnsafePointer(to: &address) {
++            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
++                bind(handle, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
++            }
++        }
++        return bindResult != 0
++        #endif
+     }
+ 
+     /// Generates a QR code for the given URL and prints it to the terminal.
+@@ -109,6 +172,11 @@ struct RunCommand: ParsableCommand {
+ 
+     /// Returns the local IP address of the machine.
+     private func getLocalIPAddress() -> String? {
++        #if os(Windows)
++        // getifaddrs/getnameinfo are POSIX; this helper is only ever called from
++        // the CoreImage-guarded QR path (Apple only), so nil is fine on Windows.
++        return nil
++        #else
+         var localIPAddress: String?
+         var interfaceAddressPointer: UnsafeMutablePointer<ifaddrs>?
+ 
+@@ -131,8 +199,9 @@ struct RunCommand: ParsableCommand {
+                     let ipAddressBytes = hostNameBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+                     let ipAddress = String(decoding: ipAddressBytes, as: UTF8.self)
+ 
+-                    // Pick the first non-loopback address
+-                    if interfaceName != "lo0" {
++                    // Pick the first non-loopback address ("lo0" on macOS,
++                    // "lo" on Linux).
++                    if interfaceName != "lo0" && interfaceName != "lo" {
+                         localIPAddress = ipAddress
+                         break
+                     }
+@@ -142,6 +211,7 @@ struct RunCommand: ParsableCommand {
+         }
+ 
+         return localIPAddress
++        #endif
+     }
+ 
+     /// Identify subsite by looking at the canonical url of 

@@ -64,13 +64,11 @@ No include cycle results, because `corecrt_math.h` only pulls `corecrt.h`
 (same module). This supersedes the empty-stub approach and works for both
 projects.
 
-### 3. Ignite source: POSIX `getifaddrs`
+### 3. Ignite source: non-portable CLI assumptions
 
-`IgniteCLI/RunCommand.getLocalIPAddress()` uses `getifaddrs`/`getnameinfo`/
-`sockaddr_in`, which don't exist on Windows. The function is only ever *called*
-from the `#if canImport(CoreImage)` (Apple-only) QR path, but it's *compiled*
-unconditionally. One-line guard to return `nil` on Windows —
-see [`ignite-runcommand-windows.patch`](ignite-runcommand-windows.patch).
+The CLI (`IgniteCLI`) makes a series of Unix/macOS assumptions. All of them are
+fixed in [`ignite-portability.patch`](ignite-portability.patch); see the
+[audit table](#portability-audit--patching-the-cli) below.
 
 ---
 
@@ -79,7 +77,7 @@ see [`ignite-runcommand-windows.patch`](ignite-runcommand-windows.patch).
 ```bash
 git clone https://github.com/twostraws/Ignite
 cd Ignite
-git apply ../ignite-runcommand-windows.patch
+git apply ../ignite-portability.patch
 swift build -c release --swift-sdk x86_64-unknown-windows-msvc -Xcc -DCMARK_GFM_STATIC_DEFINE
 # -> .build/x86_64-unknown-windows-msvc/release/IgniteCLI.exe  (PE32+ x86-64)
 ```
@@ -99,31 +97,47 @@ pipeline, SwiftSoup and Collections all cross-compile.
 
 ---
 
+## Portability audit — patching the CLI
+
+Beyond *compiling*, the CLI assumed a Unix/macOS runtime in several places.
+Every item below is fixed in [`ignite-portability.patch`](ignite-portability.patch):
+
+| # | Location | Assumption | Fix |
+|---|----------|------------|-----|
+| 1 | `Process-Execute.swift` | Hardcodes `/bin/bash -c` for **every** command — nothing runs on native Windows | Use `ComSpec`/`cmd.exe /c` on Windows, `/bin/bash -c` elsewhere |
+| 2 | `NewCommand` | `rm -rf name/.git` via the shell | `FileManager.removeItem` — no shell, works everywhere |
+| 3 | `NewCommand` | Success only if stderr lacks the word `"fatal"` — a missing git ("`'git' is not recognized`") reads as **success** | Verify the clone produced `name/Package.swift` |
+| 4 | `NewCommand` | Message says `open Package.swift` / "build with Xcode → My Mac" | Platform-neutral guidance |
+| 5 | `RunCommand` | `open <url>` to launch the browser | `open` (macOS) / `start` (Windows) / `xdg-open` (Linux) |
+| 6 | `RunCommand` | `toolDir` via `lastIndex(of: "/")` — misses Windows `\` → server script "missing" | URL path APIs (`deletingLastPathComponent`) |
+| 7 | `RunCommand` | `lsof -t -i tcp:port` for the port check — no `lsof` on Windows | Portable socket-bind probe (POSIX + WinSock via `WinSDK`) |
+| 8 | `RunCommand` | `python3` | `python` on Windows, `python3` elsewhere |
+| 9 | `RunCommand` | loopback name `"lo0"` | also skip Linux's `"lo"` |
+| — | `RunCommand` (prior) | POSIX `getifaddrs`/`sockaddr_in` compiled unconditionally | `#if os(Windows) return nil` (helper only reached from the Apple-only QR path) |
+
+The socket-bind port check is the meatiest one — it replaces the `lsof`
+shell-out with a real `bind()` probe, using `WinSDK` (`WSAStartup`/`socket`/
+`bind`/`closesocket`) on Windows and Glibc/Darwin sockets elsewhere. That's why
+the patched `IgniteCLI.exe` now imports `WS2_32.dll`.
+
 ## Smoke test (WineHQ 10.0 `wine64`, runtime DLLs alongside)
 
-| Command | Result |
-|---|---|
-| `IgniteCLI.exe --help` | ✅ full ArgumentParser help (`new` / `build` / `run`) |
-| `IgniteCLI.exe --version` | ✅ `0.6.9` |
-| `IgniteCLI.exe new TestSite` | ⚠️ **clones the starter template and writes the complete site scaffold** (`Package.swift`, `Sources/Site.swift`, `Content/`, `Assets/`, …), then traps |
+| Command | Before patches | After patches |
+|---|---|---|
+| `--help` / `--version` | ✅ works | ✅ works (`0.6.9`) |
+| `run` (with a `Build/` dir) | n/a | ✅ runs the **WinSock** port probe, resolves the tool dir to `Z:\…`, exits cleanly at the "server script missing" check — no crash |
+| `new <name>` | ⚠️ `ud2` trap in Windows `Foundation` on a Swift-Concurrency worker (in the `Task { process.run() }` + `Pipe.readDataToEndOfFile()` path), *after* writing files | ✅ no crash; honestly reports `❌ Failed … Is git installed and on your PATH?` when git is absent from the prefix |
 
-The `new` crash is instructive rather than a build defect:
+Native Linux is unaffected — `ignite new` still clones, strips `.git` (now via
+`FileManager`), and scaffolds a full site.
 
-- `IgniteCLI/Process-Execute.swift` **hardcodes** `process.executableURL =
-  /bin/bash` and runs commands (`git clone …`, `rm -rf …/.git`) via `bash -c`.
-  Under Wine, `/bin/bash` resolves to the host shell (`Z:\bin\bash`) — which is
-  *why the git clone actually succeeds*. On a real Windows box there is no
-  `/bin/bash`, so `ignite new` wouldn't run as written regardless of our build.
-- The trap is a `ud2` inside Windows `Foundation` on a Swift-Concurrency worker
-  thread, in the `Task { try process.run() }` + `Pipe.readDataToEndOfFile()`
-  path — i.e. `Foundation.Process`/`FileHandle` async subprocess handling under
-  Wine, *after* all files are written.
-
-So the executable itself is sound and substantially functional; the failure is
-a **Wine + Windows-Foundation runtime limitation** plus Ignite's CLI assuming a
-Unix shell — not a cross-compilation problem. `ignite build`/`run` can't be
-fully exercised here anyway, since they invoke a Windows Swift toolchain that
-isn't installed in the Wine prefix.
+> Why the old `new` "worked" under Wine and the new one reports failure: the old
+> code shelled to `/bin/bash`, which Wine bridges to the **host** shell (so the
+> host's `git` ran). The patched code correctly uses `cmd.exe`, so `git` must be
+> a real Windows program — absent from the bare Wine prefix, hence the honest
+> error. On a real Windows box with Git + Swift installed, the patched paths are
+> the correct ones. (`build`/`run` still need a Windows Swift toolchain and
+> `python`, which aren't in the prefix.)
 
 ## Takeaways
 
@@ -132,5 +146,6 @@ isn't installed in the Wine prefix.
 - Two cross-compilation gotchas worth remembering: `#if os(Windows)` in a
   *manifest* is host-evaluated, and the prebuilt Windows `Foundation` pins C
   math to the `corecrt` module (so SDK header shims must preserve that).
-- "Compiles and links" ≠ "behaves natively": a tool that shells out to
-  `/bin/bash` and `rm` is portable only as far as its runtime assumptions.
+- "Compiles and links" ≠ "behaves natively". Making it behave meant replacing
+  every `/bin/bash`, `rm`, `open`, `lsof`, `python3`, and `/`-separator
+  assumption with a platform-aware equivalent — the bulk of a real Windows port.
