@@ -486,3 +486,96 @@ about *what they diff*. LiveView diffs the **template** and lets the client
 reassemble HTML; Lustre diffs the **virtual DOM** and ships DOM operations.
 Everything downstream (initial render, components, batching, side channels)
 follows from that one design point.
+
+---
+
+## Appendix: where Glimr's Loom fits
+
+Glimr (`glimr-org/framework`) is a newer Gleam framework that bundles a
+LiveView-style template runtime called **Loom**. Its wire format is much
+closer to LiveView's than Lustre's is — it copies the *statics/dynamics*
+protocol rather than the *virtual-DOM patch* protocol.
+
+**State shape** (`src/glimr/loom/loom.gleam:60-72`):
+
+```gleam
+pub type LiveTree {
+  LiveTree(statics: List(String), dynamics: List(Dynamic))
+}
+
+pub type Dynamic {
+  DynString(String)        // leaf
+  DynTree(LiveTree)        // nested (conditional / component)
+  DynList(List(LiveTree))  // comprehension
+}
+```
+
+Templates (`.loom.html`) compile at build time to generated Gleam modules
+under `src/compiled/loom/` that produce `LiveTree` values — the same
+compile-time factoring LiveView does with HEEx.
+
+**Wire format** (`src/glimr/loom/runtime.gleam:618-625`, `456-462`):
+
+```json
+// initial tree
+{"s": ["<div>","</div>"], "d": ["1"]}
+// diff
+{"0": "2"}
+```
+
+Nested subtrees serialize as `{"d": {...}}` (`runtime.gleam:503-511`) and
+loops (`DynList`) are diffed per-item when lengths match
+(`runtime.gleam:535-567`) — direct analogs of LiveView's `:k`/`:kc`
+comprehensions. Branch flips are detected by comparing the raw statics lists
+(`runtime.gleam:497, 544`); no fingerprint hash.
+
+**Transport** (`src/glimr/loom/live.gleam`, `live_socket.gleam`): raw mist
+WebSocket, not Phoenix Channels. Glimr multiplexes multiple live components
+on one connection with its own three-message framing:
+
+```
+client → server:  {type:"join",  id, module, token}
+                  {type:"event", id, handler, event,
+                                 special_vars:{value,checked,key}}
+                  {type:"leave", id}
+server → client:  {type:"trees",    id, s:[...], d:[...]}   // initial
+                  {type:"patch",    id, d:{...index diff}}
+                  {type:"redirect", url}
+```
+
+The join `token` is `module:props_json` signed with `APP_KEY`
+(`live.gleam:97-118`) — same idea as LiveView's signed session token. Each
+joined component gets its own OTP actor holding `(props_json,
+prev_tree_json)`; on every event the actor calls the generated
+`handle_json → render_json → diff_tree_json` pipeline and sends `SendPatch`
+(`live_socket.gleam:108-140`).
+
+### How Loom compares to LiveView and Lustre
+
+| Feature                              | LiveView          | Loom (Glimr)             | Lustre server component  |
+|--------------------------------------|-------------------|--------------------------|--------------------------|
+| Diff unit                            | template slot     | template slot            | DOM opcode (Patch/Change)|
+| Statics / dynamics split             | `:s` / index keys | `s` / index keys         | (n/a — VDOM)             |
+| Compile-time template factoring      | yes (HEEx)        | yes (Loom→Gleam)         | (n/a)                    |
+| Template fingerprint hash            | yes               | **no** — compares statics| (n/a)                    |
+| Shared template dedup (`:p`)         | yes               | no                       | Memo dedup by ref eq     |
+| Stateful component refs (`:c` / cid) | yes               | no (inlined `DynTree`)   | separate runtime         |
+| Keyed comprehensions / streams       | yes (`:k`, stream)| same-length zip only     | `keyed_children`         |
+| Reply payload on event               | yes               | no                       | via `Emit`               |
+| `live_patch` URL nav                 | yes               | no (`redirect` only)     | no                       |
+| Upload channel                       | yes               | no                       | no                       |
+| Transport                            | Phoenix Channel   | raw mist WS + own frames | WS / SSE / polling       |
+| Dead-render before socket connects   | yes               | not in what I read       | no                       |
+| Per-connection concurrency           | 1 channel/view    | N components multiplexed | N subscribers per runtime|
+
+**Bottom line.** Loom is the closest thing in the Gleam ecosystem to
+LiveView's actual protocol — not just its architecture. It ports the
+statics/dynamics split, the index-keyed diff, the per-iteration loop
+diffing, the compile-time template factoring, and the signed-token join
+handshake. It is still an earlier-generation implementation: no
+fingerprints, no shared-template pool, no component cids, no keyed streams,
+no reply/nav/upload side-channels, and it rides raw mist WS instead of
+Phoenix Channels. If you want LiveView's diff model without leaving Gleam,
+Loom is where to look; if you want the full LiveView protocol, Elixir's
+`lissome` package still wins by hosting a Lustre app inside a real
+Phoenix.LiveView.
