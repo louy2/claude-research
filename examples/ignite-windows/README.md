@@ -139,6 +139,50 @@ Native Linux is unaffected — `ignite new` still clones, strips `.git` (now via
 > the correct ones. (`build`/`run` still need a Windows Swift toolchain and
 > `python`, which aren't in the prefix.)
 
+## Running under Wine with real Windows Git / Swift / Python
+
+To go past "the `.exe` launches" and actually drive the external tools, I
+supplied genuine Windows binaries into the Wine prefix:
+
+- **Swift 6.3.2** — `swift.exe`/`swiftc.exe`, extracted from the official
+  `swift-…-windows10.exe` installer (the same one the SDK came from).
+- **Python 3.13.14** — python.org embeddable amd64 build.
+- **Git 2.51.0** — Git for Windows, via the Anaconda `main` win-64 package
+  (GitHub release assets are blocked in this sandbox).
+
+Results (WineHQ 10.0 `wine64`, patched `IgniteCLI.exe` + runtime DLLs):
+
+| Tool | Runs under Wine | Driven by IgniteCLI |
+|---|---|---|
+| **Python** | ✅ `python.exe --version` → `3.13.14`; runs scripts | ✅ `ignite run` launched `python ignite-server.py`; `curl` fetched the served page |
+| **Git** | ✅ `git --version` → `2.51.0.windows.1`; clones GitHub through the proxy | ✅ **`ignite new` full end-to-end**: `cmd /c git clone …` → scaffold → `.git` removed → `✅ Success!` |
+| **Swift** | ⚠️ loads + enters the Swift runtime, then blocked (below) | ❌ `ignite build`/`run`'s `swift build` can't start |
+
+Two findings worth recording about the **Windows Swift toolchain under Wine**:
+
+1. **It traps on duplicate env vars behind a proxy.** The sandbox sets both
+   `NO_PROXY` and `no_proxy` (and `HTTPS_PROXY`/lowercase). Windows env vars are
+   case-insensitive, so `ProcessInfo.processInfo.environment` builds a dict with
+   a duplicate key and aborts:
+   `Fatal error: Duplicate values for key: 'ProcessEnvironmentKey(value: "NO_PROXY")'`.
+   Worked around by dropping the lowercase duplicates before launching.
+
+2. **Then it hits a Wine gap.** After the env fix, `swift.exe`/`swiftc.exe` load,
+   initialise the runtime, and abort on
+   `unimplemented function ADVAPI32.dll.SaferiIsExecutableFileType` — which is
+   `# @ stub` (commented out) in *every* Wine version. That's a Wine limitation,
+   not a problem with the toolchain or our cross-compile; the same binaries
+   compile normally on real Windows. So `ignite build`/`run` can't compile here.
+
+Git-for-Windows detail: under Wine its default **schannel** TLS backend fails
+(`failed to create certificate chain engine: Invalid parameter`); switching to
+`http.sslBackend=openssl` and pointing `http.sslCAInfo` at the sandbox CA bundle
+makes clones through the proxy work.
+
+Net: with real Windows binaries supplied, **Git and Python are driven fully by
+the patched CLI on "Windows"**; the only gap — running the Windows Swift
+*compiler* — is Wine's, not the binary's.
+
 ## Takeaways
 
 - The hand-built Linux→Windows Swift SDK scales from a toy CLI to a real
