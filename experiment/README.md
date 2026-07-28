@@ -142,6 +142,50 @@ curl -O http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz && gunzip JMdict_e.gz
 python3 jmdict_experiment.py JMdict_e
 ```
 
+## A bigger, harder corpus: UniDic
+
+[UniDic](https://clrd.ninjal.ac.jp/unidic/) (NINJAL) is the reference lexicon
+that MeCab/Sudachi-class analyzers actually ship — `unidic-cwj-3.1.1` has
+879,222 rows (494k verb rows, 319k nouns, 40k adjectives). Unlike JMdict it
+*already enumerates* conjugated forms: each surface is its own row tagged
+with 活用型/活用形 (食べる×終止形, 食べさせ×命令形, …), so
+`unidic_experiment.py` compresses the surface column of a production
+dictionary as-is:
+
+| | conjugable rows only | entire lexicon |
+|---|---:|---:|
+| unique surface strings | 367,303 | 674,927 |
+| raw UTF-8 list | 5.4 MB | 8.8 MB |
+| gzip -9 | 5.4× | 4.2× |
+| edge reduction vs trie | 9.3× | 3.3× |
+| **DAFSA serialized** | **348 KB (15.6×)** | **2.6 MB (3.3×)** |
+
+Two lessons, both of which *confirm* the mechanism rather than contradict it:
+
+- **UniDic's conjugable surfaces compress "only" 15.6× (vs 60.9× for
+  expanded JMdict) because UniDic already did the factoring.** Its surfaces
+  are morpheme-granular stems (食べさせ, not 食べさせられていました) —
+  averaging ~5 characters — with the suffix combinatorics moved out into the
+  connection grammar (its compiled `matrix.bin` is 480 MB!). The automaton
+  can only squeeze the redundancy that's left in the strings. Where JMdict
+  expansion re-creates the full-form redundancy, minimization recovers it;
+  UniDic pre-removed it.
+- **On the entire lexicon the DAFSA (3.3×) barely beats a trie and loses to
+  gzip (4.2×)** — nouns, proper nouns and symbols have no inflectional
+  structure, so there are few shared suffix trees to merge. The FSM's
+  compression *is* the morphology. (The automaton still earns its keep
+  operationally — O(length) membership and ordered/prefix iteration without
+  decompression — and a production edge encoding like Lucene's or `fst`'s is
+  ~2× tighter than this experiment's naive serialization.)
+
+Reproduce:
+
+```
+curl -O https://clrd.ninjal.ac.jp/unidic_archive/cwj/3.1.1/unidic-cwj-3.1.1.zip
+unzip unidic-cwj-3.1.1.zip unidic-cwj-3.1.1/lex_3_1.csv
+python3 unidic_experiment.py unidic-cwj-3.1.1/lex_3_1.csv
+```
+
 ## Sudachi (and MeCab/Kuromoji) already work this way
 
 Production Japanese morphological analyzers are living proof of the
@@ -199,3 +243,5 @@ factored out and weighted.
 - `jmdict_experiment.py` — full-scale run over every conjugable lemma in
   JMdict (download instructions in the file header; the corpus itself is not
   committed)
+- `unidic_experiment.py` — compresses the surface vocabulary of the UniDic
+  lexicon (unidic-cwj-3.1.1), whole and conjugable-only
