@@ -6,6 +6,19 @@ can a Japanese conjugation dictionary be compressed the same way?
 
 **Answer: yes — and it works *better* for Japanese than for Finnish.**
 
+## Inspiration
+
+Andrew Quinn, [*Replacing a 3 GB SQLite database with a 7 MB FST (finite state
+transducer) binary*](https://til.andrew-quinn.me/posts/replacing-a-3-gb-sqlite-database-with-a-7-mb-fst-finite-state-trandsucer-binary/):
+his Finnish–English dictionary app (Taskusanakirja) needed autocomplete over
+tens of millions of inflected Finnish forms. A plain trie didn't scale past
+~400k items and an SQLite FTS index ballooned to a 3 GB download; rebuilding
+the lookup on Rust's [`fst`](https://github.com/BurntSushi/fst) crate — which,
+unlike a trie, shares suffixes as well as prefixes — collapsed it to a
+single-digit-MB binary, a ~300× reduction. The question this repo answers is
+whether Japanese conjugation has enough of that shared prefix/suffix structure
+to get the same payoff. (It does — see the JMdict numbers below.)
+
 ## Why Japanese is a friendly case
 
 The "fuzzy" middle in Finnish comes from stem-internal alternations: consonant
@@ -94,6 +107,72 @@ Two things worth noting:
 
 Run it: `python3 dafsa_experiment.py` (stdlib only).
 
+## Full-scale result: all of JMdict
+
+[JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) (EDRDG, CC BY-SA — the
+open lexicon behind Jisho and most Japanese apps) is the natural corpus for
+this: every entry is POS-tagged with its exact conjugation class (`v5k`, `v1`,
+`vs-i`, `adj-i`, …), so it doubles as a conjugation dictionary once expanded.
+`jmdict_experiment.py` extracts every conjugable lemma — including the
+long-tail classes (行く-type `v5k-s`, 問う-type `v5u-s`, honorific くださる-type
+`v5aru`, suppletive ある `v5r-i`, いい/かっこいい `adj-ix`, kana-spelled 来る) and
+the ~14k `vs` nouns with する attached — and runs the same pipeline:
+
+| | small demo | full JMdict |
+|---|---:|---:|
+| lemmas | 333 | 28,976 |
+| surface forms | 11,128 | 1,051,733 |
+| raw UTF-8 list | 174 KB | 22.6 MB |
+| gzip -9 | 5.5× | 7.2× |
+| DAFSA states / edges | 625 / 1,162 | 44,632 / 79,952 |
+| edge reduction vs trie | 46× | 65× |
+| **DAFSA serialized** | **4.5 KB (38.9×)** | **372 KB (60.9×)** |
+
+The key observation: the compression ratio *improves* with scale (38.9× →
+60.9×), exactly as predicted — once the shared suffix machinery is in the
+automaton, each additional lemma costs little more than its stem bytes. A
+million-form dictionary fits in ~372 KB (pure-Python build time: ~10 s), and
+this is the same regime as the Finnish result above: raw enumeration grows
+linearly, the automaton grows roughly with lexicon novelty.
+
+Reproduce:
+
+```
+curl -O http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz && gunzip JMdict_e.gz
+python3 jmdict_experiment.py JMdict_e
+```
+
+## Sudachi (and MeCab/Kuromoji) already work this way
+
+Production Japanese morphological analyzers are living proof of the
+approach — they just factor the automaton differently:
+
+- **The lexicon is a compressed automaton over surface strings.**
+  [Sudachi](https://github.com/WorksApplications/Sudachi) stores its lexicon
+  in a **double-array trie** (darts-clone) mapping surface forms to word IDs,
+  as does MeCab; Lucene's Kuromoji goes further and stores its lexicon in a
+  **Lucene FST** — literally the structure measured here.
+- **Conjugation lives in the entries + a finite-state grammar, not as
+  enumerated full forms.** SudachiDict/UniDic don't list 食べさせられていました;
+  they list morpheme-granular entries — verb *stems* annotated with
+  conjugation type and form (五段-カ行, 連用形-促音便, …) plus the auxiliary
+  morphemes (させ, られ, て, い, まし, た) as their own entries.
+- **The connection matrix is the suffix automaton.** Each entry carries a
+  left/right context ID, and a `matrix.def` of connection costs defines which
+  morpheme classes may follow which. That table *is* a finite-state
+  transition function over morpheme categories — a cyclic one, so unbounded
+  agglutinative chains come for free. At analysis time the tokenizer builds a
+  lattice of dictionary hits and runs Viterbi over the connection costs,
+  i.e. it *composes* stem-automaton ∘ suffix-grammar on the fly instead of
+  precomputing the composition like our DAFSA does.
+
+So the two designs bracket the space: enumerate-then-minimize (this repo's
+DAFSA; simple, finite, great for membership/autocomplete) versus
+stems + finite-state connection grammar (Sudachi/MeCab; unbounded chains,
+weighted disambiguation, produces analyses). Both are the
+prefix–fuzzy–suffix FSM idea; Sudachi just keeps the suffix automaton
+factored out and weighted.
+
 ## Practical recommendations
 
 - **Just need a compact set of valid forms** (spell-check, autocomplete,
@@ -116,4 +195,7 @@ Run it: `python3 dafsa_experiment.py` (stdlib only).
 - `conjugate.py` — the conjugator (godan rows, onbin te-forms, ichidan, する,
   来る, i-adjectives)
 - `dafsa_experiment.py` — DAFSA construction (Daciuk), serialization, and the
-  size comparison above
+  small-demo size comparison
+- `jmdict_experiment.py` — full-scale run over every conjugable lemma in
+  JMdict (download instructions in the file header; the corpus itself is not
+  committed)
