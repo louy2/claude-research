@@ -1,0 +1,1750 @@
+# Simplified Chinese (zh-CN) translation catalog for the Fossil web UI.
+#
+# Format:  a "msgid" line holds the text exactly as it appears in the Fossil
+# source code, and the "msgstr" line that follows holds its translation.
+# Whitespace is normalized before lookup, so a phrase that the source wraps
+# over several lines is written here on one line.  An empty msgstr means
+# "not translated yet" and leaves the English text in place.
+#
+# Markers such as <1>...</1> stand for inline markup (<a>, <b>, <code>, ...)
+# in the original text; keep them in the translation and move them wherever
+# Chinese word order requires.  printf() conversions such as %s and %d must
+# appear in the translation in the same order as in the msgid.
+#
+# HTML entities (&nbsp;, &amp;, ...) are literal text here.  A translation is
+# free to drop them: the whole text node is replaced, not patched.
+#
+# Set FOSSIL_LOCALE_TRACE=1 on a server to have every phrase that has no
+# translation printed on stderr in this format.
+#
+# Run "fossil test-locale check zh-CN" after editing.
+
+# ------------------------------------------------- main menu and page titles
+msgid  Home
+msgstr 首页
+msgid  Timeline
+msgstr 时间线
+msgid  Files
+msgstr 文件
+msgid  Branches
+msgstr 分支
+msgid  Tags
+msgstr 标签
+msgid  Forum
+msgstr 论坛
+msgid  Chat
+msgstr 聊天
+msgid  Tickets
+msgstr 工单
+msgid  Wiki
+msgstr 维基
+msgid  Admin
+msgstr 管理
+msgid  Logout
+msgstr 退出登录
+msgid  Login
+msgstr 登录
+msgid  Main Menu
+msgstr 主菜单
+msgid  Site Map
+msgstr 站点地图
+msgid  Login/Logout
+msgstr 登录/退出
+msgid  Help
+msgstr 帮助
+msgid  Search
+msgstr 搜索
+msgid  Search%s
+msgstr 搜索%s
+msgid  Search is disabled
+msgstr 搜索功能已停用
+msgid  Not Found
+msgstr 页面不存在
+msgid  Page not found: %h
+msgstr 找不到页面：%h
+msgid  Bad Request
+msgstr 请求无效
+msgid  Help: %s
+msgstr 帮助：%s
+msgid  The "%h" command:
+msgstr “%h” 命令：
+msgid  Topic-List
+msgstr 主题列表
+
+# ------------------------------------------------------ home page and footer
+msgid  This is a stub home-page for the project. To fill in this page, first go to %zsetup/config
+msgstr 这是本项目的占位首页。要填写此页面，请先前往 %zsetup/config
+msgid  and establish a "Project Name". Then create a wiki page with that name. The content of that wiki page will be displayed in place of this message.
+msgstr 并设置“项目名称”。然后创建一个同名的维基页面，该维基页面的内容就会显示在此消息的位置。
+msgid  This page was generated in about
+msgstr 本页面生成耗时约
+msgid  s by Fossil
+msgstr 秒，由 Fossil
+
+# ------------------------------------------------------------------ timeline
+msgid  Advanced
+msgstr 高级
+msgid  Basic
+msgstr 基本
+msgid  Modern View
+msgstr 现代视图
+msgid  Columnar View
+msgstr 分栏视图
+msgid  Compact View
+msgstr 紧凑视图
+msgid  Simple View
+msgstr 简洁视图
+msgid  Verbose View
+msgstr 详细视图
+msgid  Classic View
+msgstr 经典视图
+msgid  Max:
+msgstr 上限：
+msgid  Any Type
+msgstr 所有类型
+msgid  Check-ins
+msgstr 签入
+msgid  Tech Notes
+msgstr 技术笔记
+msgid  New Tickets
+msgstr 新建工单
+msgid  Ticket Changes
+msgstr 工单变更
+msgid  New Threads
+msgstr 新主题
+msgid  Forum Posts
+msgstr 论坛帖子
+msgid  Wiki Edits
+msgstr 维基编辑
+msgid  All Changes
+msgstr 全部变更
+msgid  Timeline Events (%s) by User
+msgstr 按用户统计的时间线事件（%s）
+msgid  Basic Timeline
+msgstr 基本时间线
+msgid  Advanced Timeline
+msgstr 高级时间线
+msgid  The initial check-in for each branch:
+msgstr 每个分支的首个签入：
+msgid  Instances of timewarp
+msgstr 时间倒错实例
+msgid  No timewarps in this repository
+msgstr 本仓库中没有时间倒错
+msgid  Branch List
+msgstr 分支列表
+msgid  Leaves
+msgstr 叶节点
+msgid  Open leaves:
+msgstr 开放的叶节点：
+msgid  All
+msgstr 全部
+msgid  Closed
+msgstr 已关闭
+msgid  Context
+msgstr 上下文
+msgid  More
+msgstr 更多
+
+# -------------------------------------------------------------- file browser
+msgid  Files in the top-level directory
+msgstr 顶层目录中的文件
+msgid  from the %zlatest check-in
+msgstr 来自%z最新签入
+msgid  Download
+msgstr 下载
+msgid  File Ages
+msgstr 文件时间
+msgid  Tree-View
+msgstr 树状视图
+msgid  Flat-View
+msgstr 平铺视图
+msgid  All Check-ins
+msgstr 所有签入
+msgid  Name
+msgstr 名称
+msgid  Size
+msgstr 大小
+msgid  Age
+msgstr 时间
+msgid  Content
+msgstr 内容
+msgid  in any check-in
+msgstr 在任意签入中
+msgid  Link to Files
+msgstr 文件链接
+msgid  Hex
+msgstr 十六进制
+msgid  Line Numbers
+msgstr 行号
+msgid  Text
+msgstr 文本
+msgid  Doc
+msgstr 文档
+msgid  Blame
+msgstr 追溯
+msgid  Annotate
+msgstr 逐行追溯
+msgid  Artifact
+msgstr 工件
+msgid  Artifacts
+msgstr 工件
+msgid  Check-ins Using
+msgstr 使用此文件的签入
+msgid  Shun
+msgstr 屏蔽
+msgid  Unversioned Files
+msgstr 非版本化文件
+msgid  Upload unversioned file:
+msgstr 上传非版本化文件：
+msgid  Upload
+msgstr 上传
+msgid  No unversioned files on this server
+msgstr 本服务器上没有非版本化文件
+msgid  Unversioned Content
+msgstr 非版本化内容
+
+# ----------------------------------------- check-in and artifact information
+msgid  Check-in [%S]
+msgstr 签入 [%S]
+msgid  Overview
+msgstr 概览
+msgid  Comment:
+msgstr 备注：
+msgid  Downloads:
+msgstr 下载：
+msgid  | %zZIP archive
+msgstr | %zZIP 归档
+msgid  | %zSQL archive
+msgstr | %zSQL 归档
+msgid  Timelines:
+msgstr 时间线：
+msgid  | %zancestors
+msgstr | %z祖先
+msgid  | %zdescendants
+msgstr | %z后代
+msgid  | %zboth
+msgstr | %z两者
+msgid  Files:
+msgstr 文件：
+msgid  | %zfile ages
+msgstr | %z文件时间
+msgid  | %zfolders
+msgstr | %z目录
+msgid  Other&nbsp;Links:
+msgstr 其他链接：
+msgid  | %ztags
+msgstr | %z标签
+msgid  | %zmlink table
+msgstr | %zmlink 表
+msgid  | %zedit
+msgstr | %z编辑
+msgid  (Record ID: %d)
+msgstr （记录 ID：%d）
+msgid  User&nbsp;&amp;&nbsp;Date:
+msgstr 用户和日期：
+msgid  Received&nbsp;From:
+msgstr 接收自：
+msgid  Rcvid %d
+msgstr 接收 ID %d
+msgid  Add&nbsp;Wiki:
+msgstr 添加维基：
+msgid  Changes
+msgstr 变更
+msgid  Added %z%h
+msgstr 添加了 %z%h
+msgid  version %z[%S]
+msgstr 版本 %z[%S]
+msgid  All files named "%s"
+msgstr 所有名为 “%s” 的文件
+msgid  Added:
+msgstr 已添加：
+msgid  Deleted:
+msgstr 已删除：
+msgid  Edited:
+msgstr 已修改：
+msgid  check-in:&nbsp;
+msgstr 签入：
+msgid  user:&nbsp;
+msgstr 用户：
+msgid  branch:&nbsp;%z%h
+msgstr 分支：%z%h
+msgid  branch:&nbsp;
+msgstr 分支：
+msgid  size:&nbsp;%d
+msgstr 大小：%d
+msgid  MLink Table
+msgstr MLink 表
+msgid  File %z%h
+msgstr 文件 %z%h
+msgid  Manifest of check-in
+msgstr 签入清单
+msgid  - %!W by
+msgstr - %!W，作者
+msgid  Received on %s from %h at %h. (
+msgstr 于 %s 从 %h 经 %h 接收。(
+msgid  rcvid&nbsp;%d
+msgstr 接收 ID %d
+msgid  List Of Artifacts
+msgstr 工件列表
+msgid  RID
+msgstr RID
+msgid  Hash
+msgstr 哈希
+msgid  Received
+msgstr 接收时间
+msgid  Description
+msgstr 描述
+msgid  Ref
+msgstr 引用
+msgid  Remarks
+msgstr 备注
+msgid  250 Largest
+msgstr 最大的 250 个
+msgid  Artifact Stats
+msgstr 工件统计
+msgid  Clusters
+msgstr 簇
+msgid  Phantoms
+msgstr 幻影工件
+msgid  Private
+msgstr 私有
+msgid  Recent
+msgstr 最近
+msgid  Unclustered
+msgstr 未成簇
+msgid  Xfer Log
+msgstr 传输日志
+
+# --------------------------------------------------------- branches and tags
+msgid  Branch Name
+msgstr 分支名称
+msgid  Last Change
+msgstr 最后变更
+msgid  Status
+msgstr 状态
+msgid  Resolution
+msgstr 合并去向
+msgid  Use Branch Colors
+msgstr 使用分支颜色
+msgid  Non-propagating tags:
+msgstr 非传播标签：
+msgid  Tag Name
+msgstr 标签名称
+msgid  Most Recent
+msgstr 最近一次
+msgid  Count
+msgstr 数量
+
+# ------------------------------------------------------- diff and annotation
+msgid  Check-in Differences
+msgstr 签入差异
+msgid  Difference From
+msgstr 差异起点
+msgid  To
+msgstr 至
+msgid  Invert
+msgstr 反转
+msgid  Patch
+msgstr 补丁
+msgid  Path
+msgstr 路径
+msgid  Unified Diff
+msgstr 统一差异
+msgid  Side-by-side
+msgstr 并排
+msgid  Unified
+msgstr 统一
+msgid  Ignore Whitespace
+msgstr 忽略空白
+msgid  Annotation For %h
+msgstr %h 的逐行追溯
+msgid  Versions of %z%h
+msgstr %z%h 的各个版本
+msgid  analyzed:
+msgstr 已分析：
+msgid  artifact %z%S
+msgstr 工件 %z%S
+msgid  Origin for each line in %z%h
+msgstr %z%h 中每一行的来源
+msgid  from check-in %z%S
+msgstr 来自签入 %z%S
+
+# ---------------------------------------------------------------------- wiki
+msgid  Wiki Help
+msgstr 维基帮助
+msgid  Wiki Links
+msgstr 维基链接
+msgid  to wiki pages.
+msgstr 到维基页面。
+msgid  Formatting rules for %zFossil Wiki
+msgstr %zFossil 维基的格式规则
+msgid  and for %zMarkdown Wiki
+msgstr 以及 %zMarkdown 维基的格式规则
+msgid  Use the %zSandbox
+msgstr 使用%z沙盒
+msgid  to experiment.
+msgstr 进行试验。
+msgid  Create a %znew wiki page
+msgstr 创建一个%z新的维基页面
+msgid  Create a %znew tech-note
+msgstr 创建一条%z新的技术笔记
+msgid  available on this server.
+msgstr 在本服务器上可用。
+msgid  List
+msgstr 列表
+msgid  Available Wiki Pages
+msgstr 可用的维基页面
+msgid  Versions
+msgstr 版本
+msgid  Create A New Wiki Page
+msgstr 创建新的维基页面
+msgid  Rules for wiki page names:
+msgstr 维基页面名称的规则：
+msgid  Must not begin or end with a space.
+msgstr 首尾不能是空格。
+msgid  Must not contain any control characters, including tab or newline.
+msgstr 不能包含任何控制字符，包括制表符和换行符。
+msgid  Must not have two or more spaces in a row internally.
+msgstr 内部不能出现连续两个及以上的空格。
+msgid  Must be between 1 and 100 characters in length.
+msgstr 长度必须在 1 到 100 个字符之间。
+msgid  Name of new wiki page:
+msgstr 新维基页面的名称：
+msgid  Create
+msgstr 创建
+msgid  Wiki Editor
+msgstr 维基编辑器
+msgid  Status messages will go here.
+msgstr 状态消息将显示在这里。
+msgid  Loading...
+msgstr 加载中……
+msgid  Loading wiki pages list...
+msgstr 正在加载维基页面列表……
+msgid  Mime type
+msgstr MIME 类型
+msgid  Save
+msgstr 保存
+msgid  Save &amp; Close
+msgstr 保存并关闭
+msgid  Discard &amp; Reload
+msgstr 放弃并重新加载
+msgid  Shift-enter previews
+msgstr Shift+Enter 预览
+msgid  Auto-refresh?
+msgstr 自动刷新？
+msgid  Diffs will be shown here.
+msgstr 差异将显示在这里。
+msgid  Attachments
+msgstr 附件
+msgid  No attachments for the current page.
+msgstr 当前页面没有附件。
+msgid  Wiki formatting rules
+msgstr 维基格式规则
+msgid  Fossil wiki format
+msgstr Fossil 维基格式
+msgid  Markdown format
+msgstr Markdown 格式
+msgid  Plain-text pages use no special formatting.
+msgstr 纯文本页面不使用任何特殊格式。
+msgid  The "Sandbox" Page
+msgstr “沙盒”页面
+msgid  Wiki Name Rules
+msgstr 维基名称规则
+msgid  Wiki Formatting Rules
+msgstr 维基格式规则
+msgid  Markdown Formatting Rules
+msgstr Markdown 格式规则
+msgid  Markdown
+msgstr Markdown
+msgid  Plain-Text
+msgstr 纯文本
+msgid  All Attachments
+msgstr 全部附件
+msgid  Status message area. Double-click to clear them.
+msgstr 状态消息区。双击可清空。
+msgid  Save edits to this page and optionally return to the wiki page viewer.
+msgstr 保存对本页的修改，并可选择返回维基页面浏览器。
+msgid  This page requires JavaScript (ES2015, a.k.a. ES6, or newer).
+msgstr 本页面需要 JavaScript（ES2015，即 ES6 或更新版本）。
+
+# --------------------------------------------------------------------- forum
+msgid  No forum posts found
+msgstr 未找到论坛帖子
+msgid  New Thread
+msgstr 新建主题
+msgid  New Forum Thread
+msgstr 新建论坛主题
+msgid  New Thread:
+msgstr 新建主题：
+msgid  From: %h
+msgstr 作者：%h
+msgid  Title:
+msgstr 标题：
+msgid  Submit
+msgstr 提交
+msgid  Preview
+msgstr 预览
+msgid  Cancel
+msgstr 取消
+msgid  Dry run
+msgstr 试运行
+msgid  Require moderator approval
+msgstr 需要版主审核
+msgid  Show query parameters
+msgstr 显示查询参数
+msgid  Do not send notification emails
+msgstr 不发送通知邮件
+msgid  You will be able to attach files to this post after saving it.
+msgstr 保存本帖之后即可为它添加附件。
+msgid  Forum Threads
+msgstr 论坛主题
+msgid  markdown reference
+msgstr Markdown 参考
+
+# ---------------------------------------------------------------------- chat
+msgid  Preview message (Shift-Enter)
+msgstr 预览消息（Shift+Enter）
+msgid  Search chat history
+msgstr 搜索聊天记录
+msgid  Attach file to message
+msgstr 为消息添加附件
+msgid  Configure chat
+msgstr 配置聊天
+msgid  Send message (Ctrl-Enter)
+msgstr 发送消息（Ctrl+Enter）
+msgid  Users who have messages in the currently-loaded list.
+msgstr 在当前已加载列表中发过消息的用户。
+msgid  Tap a user name
+msgstr 点击用户名
+msgid  to filter messages on that user and tap again to clear the filter.
+msgstr 可只显示该用户的消息，再次点击可清除筛选。
+msgid  Tap the title
+msgstr 点击标题
+msgid  of this widget to toggle the list on and off.
+msgstr 可以显示或隐藏此列表。
+msgid  Active users (sorted by last message time)
+msgstr 活跃用户（按最后发言时间排序）
+msgid  Preview: (
+msgstr 预览：（
+msgid  Close Preview
+msgstr 关闭预览
+msgid  Close Settings
+msgstr 关闭设置
+msgid  Clear results
+msgstr 清除结果
+msgid  Close Search
+msgstr 关闭搜索
+msgid  Close Zoom
+msgstr 关闭缩放
+
+# ------------------------------------------------------------------- tickets
+msgid  Ticket Main Menu
+msgstr 工单主菜单
+msgid  Choose a report format from the following list:
+msgstr 从下面的列表中选择一种报表格式：
+msgid  New
+msgstr 新建
+msgid  Ticket Setup
+msgstr 工单设置
+
+# ---------------------------------------------------- statistics and reports
+msgid  Repository Statistics
+msgstr 仓库统计
+msgid  Repository&nbsp;Size:
+msgstr 仓库大小：
+msgid  Number&nbsp;Of&nbsp;Artifacts:
+msgstr 工件数量：
+msgid  Details
+msgstr 详情
+msgid  Uncompressed&nbsp;Artifact&nbsp;Size:
+msgstr 未压缩工件大小：
+msgid  Compression&nbsp;Ratio:
+msgstr 压缩率：
+msgid  Number&nbsp;Of&nbsp;Check-ins:
+msgstr 签入数量：
+msgid  Number&nbsp;Of&nbsp;Files:
+msgstr 文件数量：
+msgid  Number&nbsp;Of&nbsp;Wiki&nbsp;Pages:
+msgstr 维基页面数量：
+msgid  Number&nbsp;Of&nbsp;Tickets:
+msgstr 工单数量：
+msgid  Project&nbsp;Age:
+msgstr 项目年龄：
+msgid  Project&nbsp;ID:
+msgstr 项目 ID：
+msgid  Fossil&nbsp;Version:
+msgstr Fossil 版本：
+msgid  (details)
+msgstr （详情）
+msgid  SQLite&nbsp;Version:
+msgstr SQLite 版本：
+msgid  Pikchr&nbsp;Version:
+msgstr Pikchr 版本：
+msgid  OpenSSL&nbsp;Version:
+msgstr OpenSSL 版本：
+msgid  Web&nbsp;Server:
+msgstr Web 服务器：
+msgid  Schema&nbsp;Version:
+msgstr 模式版本：
+msgid  Repository Rebuilt:
+msgstr 仓库重建时间：
+msgid  Database&nbsp;Stats:
+msgstr 数据库统计：
+msgid  Backoffice:
+msgstr 后台任务：
+msgid  Last run: %z
+msgstr 上次运行：%z
+msgid  Activity Reports
+msgstr 活动报表
+msgid  Environment
+msgstr 环境
+msgid  Hash Collisions
+msgstr 哈希冲突
+msgid  Schema
+msgstr 数据库模式
+msgid  Table Sizes
+msgstr 表大小
+msgid  URLs
+msgstr URL
+msgid  Web-Cache
+msgstr 网页缓存
+msgid  Stats
+msgstr 统计
+msgid  Stat
+msgstr 统计
+msgid  User
+msgstr 用户
+msgid  Events
+msgstr 事件
+msgid  Merge check-ins
+msgstr 合并签入
+msgid  Non-merge check-ins
+msgstr 非合并签入
+msgid  File Changes
+msgstr 文件变更
+msgid  By Month
+msgstr 按月
+msgid  By User
+msgstr 按用户
+msgid  By Week
+msgstr 按周
+msgid  By Day
+msgstr 按天
+msgid  By Weekday
+msgstr 按星期
+msgid  By Year
+msgstr 按年
+msgid  By Hour
+msgstr 按小时
+msgid  Hash Prefix Collisions
+msgstr 哈希前缀冲突
+msgid  Hash Prefix Collisions on Check-ins
+msgstr 签入的哈希前缀冲突
+msgid  Hash Prefix Collisions on All Artifacts
+msgstr 所有工件的哈希前缀冲突
+msgid  Length
+msgstr 长度
+msgid  Instances
+msgstr 实例
+msgid  First Instance
+msgstr 首个实例
+msgid  Total number of hashes: %d
+msgstr 哈希总数：%d
+msgid  Web Cache Status
+msgstr 网页缓存状态
+msgid  About The Web-Cache
+msgstr 关于网页缓存
+msgid  Web-cache is currently disabled.
+msgstr 网页缓存当前已停用。
+msgid  Enable
+msgstr 启用
+msgid  Environment Test
+msgstr 环境测试
+msgid  POST Test
+msgstr POST 测试
+msgid  Cookies
+msgstr Cookie
+
+# ----------------------------------------- login, registration and passwords
+msgid  Currently logged in as
+msgstr 当前登录身份
+msgid  Select your preferred
+msgstr 选择你偏好的
+msgid  site skin
+msgstr 站点皮肤
+msgid  Manage your
+msgstr 管理你的
+msgid  cookies
+msgstr Cookie
+msgid  or your
+msgstr 或你的
+msgid  access tokens
+msgstr 访问令牌
+msgid  Change Password for user
+msgstr 修改用户密码
+msgid  Old Password:
+msgstr 旧密码：
+msgid  New Password:
+msgstr 新密码：
+msgid  Suggestion: %z
+msgstr 建议：%z
+msgid  Repeat New Password:
+msgstr 重复新密码：
+msgid  Change Password
+msgstr 修改密码
+msgid  Password:
+msgstr 密码：
+msgid  Login:
+msgstr 登录名：
+msgid  Registration not possible
+msgstr 无法注册
+msgid  This project does not allow user self-registration. Please contact the project administrator to obtain an account.
+msgstr 本项目不允许用户自助注册。请联系项目管理员以获取账号。
+msgid  Login is prohibited if the password is an empty string.
+msgstr 密码为空字符串时禁止登录。
+
+# ------------------------------------------------------- user administration
+msgid  User List
+msgstr 用户列表
+msgid  Category
+msgstr 类别
+msgid  Capabilities (
+msgstr 权限（
+msgid  key
+msgstr 说明
+msgid  (key)
+msgstr （说明）
+msgid  Info
+msgstr 信息
+msgid  All logged-in users
+msgstr 所有已登录用户
+msgid  Users with '
+msgstr 拥有 '
+msgid  ' capability
+msgstr ' 权限的用户
+msgid  All users without login
+msgstr 所有未登录用户
+msgid  Users
+msgstr 用户
+msgid  Login Name
+msgstr 登录名
+msgid  Caps
+msgstr 权限
+msgid  Date
+msgstr 日期
+msgid  Expire
+msgstr 过期
+msgid  Last Login
+msgstr 最后登录
+msgid  Alerts
+msgstr 提醒
+msgid  Add
+msgstr 添加
+msgid  Log
+msgstr 日志
+msgid  Unused
+msgstr 未使用
+msgid  Edit User %h
+msgstr 编辑用户 %h
+msgid  User ID:
+msgstr 用户 ID：
+msgid  Contact&nbsp;Info:
+msgstr 联系信息：
+msgid  Capabilities:
+msgstr 权限：
+msgid  Selected Cap:
+msgstr 已选权限：
+msgid  (missing JS?)
+msgstr （缺少 JS？）
+msgid  (Leave unchanged to retain password)
+msgstr （保持不变即保留原密码）
+msgid  Delete User
+msgstr 删除用户
+msgid  Notes On Privileges And Capabilities:
+msgstr 关于特权与权限的说明：
+msgid  Capability Key
+msgstr 权限说明
+msgid  Code
+msgstr 代码
+msgid  User capability summary:
+msgstr 用户权限汇总：
+msgid  Users with administrator privilege are: %s
+msgstr 拥有管理员特权的用户：%s
+msgid  Special Logins
+msgstr 特殊登录账号
+msgid  Access Log
+msgstr 访问日志
+msgid  Admin Log
+msgstr 管理日志
+msgid  Log-Menu
+msgstr 日志菜单
+msgid  Setup%s
+msgstr 系统设置%s
+msgid  Admin%s
+msgstr 管理员%s
+msgid  Reader%s
+msgstr 只读用户%s
+msgid  Developer%s
+msgstr 开发者%s
+msgid  View-PII%s
+msgstr 查看个人信息%s
+msgid  Password%s
+msgstr 修改密码%s
+msgid  Check-In%s
+msgstr 签入%s
+msgid  Check-Out%s
+msgstr 签出%s
+msgid  Hyperlinks%s
+msgstr 超链接%s
+msgid  Attachments%s
+msgstr 添加附件%s
+msgid  Forum Attachments%s
+msgstr 论坛附件%s
+msgid  Clone%s
+msgstr 克隆%s
+msgid  Read Wiki%s
+msgstr 阅读维基%s
+msgid  New Wiki%s
+msgstr 新建维基%s
+msgid  Append Wiki%s
+msgstr 追加维基%s
+msgid  Write Wiki%s
+msgstr 编辑维基%s
+msgid  Moderate Wiki%s
+msgstr 审核维基%s
+msgid  Read Ticket%s
+msgstr 阅读工单%s
+msgid  New Tickets%s
+msgstr 新建工单%s
+msgid  Append To Ticket%s
+msgstr 追加工单%s
+msgid  Write Tickets%s
+msgstr 编辑工单%s
+msgid  Moderate Tickets%s
+msgstr 审核工单%s
+msgid  Ticket Report%s
+msgstr 工单报表%s
+msgid  Private%s
+msgstr 私有内容%s
+msgid  Write Unversioned%s
+msgstr 写入非版本化文件%s
+msgid  Download Zip%s
+msgstr 下载 Zip%s
+msgid  Read Forum%s
+msgstr 阅读论坛%s
+msgid  Write Forum%s
+msgstr 发表论坛帖%s
+msgid  WriteTrusted Forum%s
+msgstr 免审发帖%s
+msgid  Attach to Forum%s
+msgstr 论坛加附件%s
+msgid  Moderate Forum%s
+msgstr 审核论坛%s
+msgid  Supervise Forum%s
+msgstr 监管论坛%s
+msgid  Email Alerts%s
+msgstr 邮件提醒%s
+msgid  Send Announcements%s
+msgstr 发送公告%s
+msgid  Chatroom%s
+msgstr 聊天室%s
+msgid  Enable Debug%s
+msgstr 启用调试%s
+
+# ------------------------------------------------------------ administration
+msgid  Server Administration
+msgstr 服务器管理
+msgid  Administration Pages
+msgstr 管理页面
+msgid  Security Audit
+msgstr 安全审计
+msgid  Pending Moderation Requests
+msgstr 待处理的审核请求
+msgid  All Pending Moderation Requests
+msgstr 所有待处理的审核请求
+msgid  Access Control
+msgstr 访问控制
+msgid  Access Control Settings
+msgstr 访问控制设置
+msgid  Apply Changes
+msgstr 应用更改
+msgid  Settings
+msgstr 设置
+msgid  Configuration
+msgstr 配置
+msgid  WWW Configuration
+msgstr WWW 配置
+msgid  Search Configuration
+msgstr 搜索配置
+msgid  Wiki Configuration
+msgstr 维基配置
+msgid  Chat Configuration
+msgstr 聊天配置
+msgid  Timeline Display Preferences
+msgstr 时间线显示首选项
+msgid  Robot Defense Settings
+msgstr 机器人防御设置
+msgid  Robot Defenses
+msgstr 机器人防御
+msgid  Email Notification Setup
+msgstr 邮件通知设置
+msgid  Moderator For Wiki And Tickets
+msgstr 维基与工单的审核者
+msgid  Change
+msgstr 更改
+msgid  Go
+msgstr 执行
+msgid  Set
+msgstr 设置
+msgid  Delete
+msgstr 删除
+msgid  Refresh
+msgstr 刷新
+msgid  Disabled
+msgstr 已停用
+msgid  Required.
+msgstr 必填。
+msgid  Note:
+msgstr 注意：
+msgid  WARNING:
+msgstr 警告：
+msgid  CAUTION:
+msgstr 小心：
+msgid  Status &ensp;
+msgstr 状态
+msgid  Add New Subscriber
+msgstr 添加新订阅者
+msgid  Send Announcement
+msgstr 发送公告
+msgid  Subscribers
+msgstr 订阅者
+msgid  Email alerts are disabled
+msgstr 邮件提醒已停用
+msgid  Only settings whose value is different from the default are shown. Click the "All" button above to set all settings.
+msgstr 此处只显示与默认值不同的设置。点击上方的“全部”按钮可查看全部设置。
+msgid  Settings marked with (v) are "versionable" and will be overridden by the contents of managed files named "
+msgstr 标有 (v) 的设置是“可版本化”的，会被受管文件覆盖，文件名为 “
+msgid  ". If the file for a versionable setting exists, the value cannot be changed on this screen.
+msgstr ”。如果某个可版本化设置对应的文件存在，则无法在本页面修改其取值。
+msgid  Rebuild Full-Text Search Index
+msgstr 重建全文搜索索引
+msgid  Create A Full-Text Index
+msgstr 创建全文索引
+msgid  Search all checked-in files
+msgstr 搜索所有已签入的文件
+msgid  Search all wiki, HTML, Markdown, and Text files
+msgstr 搜索所有维基、HTML、Markdown 和文本文件
+msgid  Search all Markdown files in the doc/ subfolder and all README.txt files.
+msgstr 搜索 doc/ 子目录下的所有 Markdown 文件以及所有 README.txt 文件。
+msgid  (blank)
+msgstr （留空）
+msgid  Search nothing. (Disables document search).
+msgstr 不搜索任何内容。（停用文档搜索。）
+msgid  The main menu for the web interface
+msgstr 网页界面的主菜单
+msgid  Reset menu to default value
+msgstr 将菜单重置为默认值
+msgid  Extra links to appear on the
+msgstr 要额外显示的链接，位于
+msgid  The command that generated this page:
+msgstr 生成本页面的命令：
+msgid  Content Security Policy:
+msgstr 内容安全策略：
+
+# ---------------------------------------------- logo and skin administration
+msgid  Customize Skin
+msgstr 自定义皮肤
+msgid  Skin-Admin
+msgstr 皮肤管理
+msgid  Skin Admin
+msgstr 皮肤管理
+msgid  Step 1: Identify Which Draft To Use
+msgstr 第 1 步：确定使用哪个草稿
+msgid  Draft skin to edit:
+msgstr 要编辑的草稿皮肤：
+msgid  Step 2: Authenticate
+msgstr 第 2 步：授权
+msgid  Authorized editors for skin draft%d:
+msgstr 草稿皮肤 draft%d 的授权编辑者：
+msgid  Step 3: Initialize The Draft
+msgstr 第 3 步：初始化草稿
+msgid  Initialize skin
+msgstr 初始化皮肤
+msgid  using
+msgstr 使用
+msgid  Step 4: Make Edits
+msgstr 第 4 步：进行编辑
+msgid  Edit the components of the draft%d skin:
+msgstr 编辑草稿皮肤 draft%d 的各个部分：
+msgid  CSS
+msgstr CSS
+msgid  Header
+msgstr 页眉
+msgid  Footer
+msgstr 页脚
+msgid  Javascript
+msgstr JavaScript
+msgid  (optional)
+msgstr （可选）
+msgid  Step 5: Verify The Draft Skin
+msgstr 第 5 步：验证草稿皮肤
+msgid  Step 6: Iterate
+msgstr 第 6 步：反复迭代
+msgid  Repeat
+msgstr 重复
+msgid  step 4
+msgstr 第 4 步
+msgid  and
+msgstr 和
+msgid  step 5
+msgstr 第 5 步
+msgid  Step 7: Publish
+msgstr 第 7 步：发布
+msgid  Publish Draft%d
+msgstr 发布 Draft%d
+msgid  Step 8: Cleanup and Undo Actions
+msgstr 第 8 步：清理与撤销操作
+msgid  Visit the
+msgstr 访问
+msgid  page for cleanup and recovery actions.
+msgstr 页面进行清理与恢复操作。
+msgid  Initialize the draft%d skin to one of the built-in skins or a preexisting skin, to use as a baseline.
+msgstr 将草稿皮肤 draft%d 初始化为某个内置皮肤或已有皮肤，作为基础。
+msgid  You will probably need to press Reload on your browser before any CSS changes will take effect.
+msgstr CSS 的改动通常需要在浏览器中按重新加载后才会生效。
+msgid  as many times as necessary to create a production-ready skin.
+msgstr ，直到皮肤达到可用于正式环境的水平。
+msgid  Skin draft%d has been tested and found ready for production.
+msgstr 草稿皮肤 draft%d 已经过测试，可用于正式环境。
+msgid  The current skin should be overwritten with draft%d.
+msgstr 应使用 draft%d 覆盖当前皮肤。
+msgid  You will probably need to press Reload on your browser after publishing the new skin.
+msgstr 发布新皮肤后，通常需要在浏览器中按重新加载。
+msgid  Edit Project Logo And Background
+msgstr 编辑项目徽标与背景
+msgid  The current project logo has a MIME-Type of
+msgstr 当前项目徽标的 MIME 类型为
+msgid  and looks like this:
+msgstr ，外观如下：
+msgid  logo
+msgstr 徽标
+msgid  header setup
+msgstr 页眉设置
+msgid  Logo Image file:
+msgstr 徽标图片文件：
+msgid  Change Logo
+msgstr 更改徽标
+msgid  Revert To Default
+msgstr 恢复默认
+msgid  background
+msgstr 背景
+msgid  Background image file:
+msgstr 背景图片文件：
+msgid  Change Background
+msgstr 更改背景
+msgid  The current background image has a MIME-Type of
+msgstr 当前背景图片的 MIME 类型为
+msgid  The current icon image has a MIME-Type of
+msgstr 当前图标的 MIME 类型为
+msgid  icon
+msgstr 图标
+msgid  Icon image file:
+msgstr 图标图片文件：
+msgid  Change Icon
+msgstr 更改图标
+msgid  The logo is accessible to all users at this URL:
+msgstr 所有用户都可以通过此 URL 访问徽标：
+msgid  The background image is accessible to all users at this URL:
+msgstr 所有用户都可以通过此 URL 访问背景图片：
+msgid  The icon image is accessible to all users at this URL:
+msgstr 所有用户都可以通过此 URL 访问图标：
+msgid  . To change the logo image, use the following form:
+msgstr 。要更改徽标图片，请使用下面的表单：
+msgid  . To change the background image, use the following form:
+msgstr 。要更改背景图片，请使用下面的表单：
+msgid  Your browser has probably cached these images, so you may need to press the Reload button before changes will take effect.
+msgstr 浏览器很可能缓存了这些图片，因此你可能需要按重新加载按钮，改动才会生效。
+
+# ------------------------------------------------------------ security audit
+msgid  This repository is
+msgstr 本仓库是
+msgid  PUBLIC
+msgstr 公开的
+msgid  Take it private
+msgstr 将其设为私有
+msgid  This repository does not have a
+msgstr 本仓库没有
+msgid  canonical access URL
+msgstr 规范访问 URL
+msgid  vuln-report setting
+msgstr vuln-report 设置
+msgid  "Server Load Average Limit"
+msgstr “服务器平均负载上限”
+msgid  on the
+msgstr 位于
+msgid  add the "--errorlog
+msgstr 添加 “--errorlog
+msgid  FILENAME
+msgstr 文件名
+msgid  No limits on the load average
+msgstr 未限制平均负载
+msgid  Robots are excluded from pages matching: %h
+msgstr 以下页面禁止机器人访问：%h
+msgid  The server error log is disabled. To set up an error log,
+msgstr 服务器错误日志已停用。要启用错误日志，
+msgid  . All checked-in content can be accessed by anonymous users.
+msgstr 。所有已签入的内容都可以被匿名用户访问。
+msgid  Hyperlinks auto-enabled based on HTTP Header and Javascript.
+msgstr 已根据 HTTP 头和 JavaScript 自动启用超链接。
+msgid  WARNING: Device "/dev/null" is not available for reading and writing.
+msgstr 警告：设备 “/dev/null” 无法读写。
+
+# ---------------------------------------------------------- check-in editing
+msgid  Edit Check-in %S
+msgstr 编辑签入 %S
+msgid  Original Context Around Check-in %S on %s
+msgstr 签入 %S 在 %s 的原始上下文
+msgid  Proposed Changes For Check-In %S:
+msgstr 对签入 %S 拟做的更改：
+msgid  User:
+msgstr 用户：
+msgid  Check-in Time:
+msgstr 签入时间：
+msgid  Background&nbsp;Color:
+msgstr 背景颜色：
+msgid  Change background color:
+msgstr 更改背景颜色：
+msgid  Propagate color to descendants
+msgstr 将颜色传播给后代
+msgid  Tags:
+msgstr 标签：
+msgid  Branching:
+msgstr 分支：
+msgid  Branch Hiding:
+msgstr 分支隐藏：
+msgid  Hide branch
+msgstr 隐藏分支
+msgid  from the timeline starting from this check-in
+msgstr ，从本次签入开始不再显示于时间线
+msgid  Leaf Closure:
+msgstr 叶节点关闭：
+msgid  Leaf
+msgstr 叶节点
+msgid  Add the following new tag name to this check-in:
+msgstr 为本次签入添加以下新标签名：
+msgid  Starting from this check-in, rename the branch to:
+msgstr 从本次签入开始，将分支重命名为：
+
+# ------------------------------------------------------- downloads and clone
+msgid  Suggested Downloads
+msgstr 推荐下载
+msgid  You Can Clone This Repository
+msgstr 你可以克隆本仓库
+msgid  URLs and Checkouts
+msgstr URL 与工作目录
+msgid  No record of any URLs or checkouts
+msgstr 没有任何 URL 或工作目录的记录
+msgid  No tarball/ZIP suggestions are available at this time
+msgstr 当前没有可推荐的 tarball/ZIP 下载
+msgid  Clone this repository by running a command similar to the following:
+msgstr 运行类似下面的命令即可克隆本仓库：
+
+# --------------------------------------------------------- advertising units
+msgid  Edit Ad Unit
+msgstr 编辑广告单元
+msgid  Banner Ad-Unit:
+msgstr 横幅广告单元：
+msgid  Right-Column Ad-Unit:
+msgstr 右栏广告单元：
+msgid  Delete Ad-Unit
+msgstr 删除广告单元
+msgid  Ad-Unit Notes:
+msgstr 广告单元说明：
+msgid  The "Banner Ad-Unit" is used for wide pages.
+msgstr “横幅广告单元”用于宽页面。
+msgid  The "Right-Column Ad-Unit" is used on pages with tall, narrow content.
+msgstr “右栏广告单元”用于内容窄而长的页面。
+msgid  If the "Right-Column Ad-Unit" is blank, the "Banner Ad-Unit" is used on all pages.
+msgstr 如果“右栏广告单元”为空，则所有页面都使用“横幅广告单元”。
+msgid  Leave both Ad-Units blank to disable all advertising.
+msgstr 两个广告单元都留空即可停用所有广告。
+
+# --------------------------------------------------------------- file editor
+msgid  File Editor (disabled)
+msgstr 文件编辑器（已停用）
+msgid  Online File Editing Is Disabled
+msgstr 在线文件编辑已停用
+msgid  To enable online editing, the
+msgstr 要启用在线编辑，
+msgid  fileedit-glob
+msgstr fileedit-glob
+msgid  repository setting
+msgstr 仓库设置
+
+# ------------------------------------------------------------- miscellaneous
+msgid  Suggested
+msgstr 建议
+msgid  changes:
+msgstr 更改：
+msgid  checked
+msgstr 已选中
+msgid  selected
+msgstr 已选中
+msgid  none
+msgstr 无
+msgid  or
+msgstr 或
+msgid  btw
+msgstr 顺带一提
+msgid  regular expressions
+msgstr 正则表达式
+msgid  Exception #1
+msgstr 例外 #1
+msgid  Exception #2
+msgstr 例外 #2
+msgid  Exception #3
+msgstr 例外 #3
+msgid  Do not allow robots access to these pages.
+msgstr 禁止机器人访问这些页面。
+msgid  The settings on this page are intended to help administrators defend against abusive robots.
+msgstr 本页的设置用于帮助管理员抵御滥用的机器人。
+
+# --------------------------------------------------- admin landing page menu
+msgid  Grant privileges to individual users.
+msgstr 为单个用户授予权限。
+msgid  Access
+msgstr 访问控制
+msgid  Control access settings.
+msgstr 控制访问相关的设置。
+msgid  Configure the WWW components of the repository
+msgstr 配置本仓库的 WWW 组件
+msgid  Security-Audit
+msgstr 安全审计
+msgid  Analyze the current configuration for security problems
+msgstr 分析当前配置中的安全问题
+msgid  Robot-Defense
+msgstr 机器人防御
+msgid  Settings for configure defense against robots
+msgstr 配置机器人防御的相关设置
+msgid  Web interface to the "fossil settings" command
+msgstr “fossil settings” 命令的网页界面
+msgid  Timeline display preferences
+msgstr 时间线显示首选项
+msgid  Tarballs and ZIPs
+msgstr Tarball 与 ZIP
+msgid  Preferences for auto-generated tarballs and ZIP files
+msgstr 自动生成 tarball 与 ZIP 文件的首选项
+msgid  Login-Group
+msgstr 登录组
+msgid  Manage single sign-on between this repository and others on the same server
+msgstr 管理本仓库与同一服务器上其他仓库之间的单点登录
+msgid  Configure the trouble-ticketing system for this repository
+msgstr 配置本仓库的问题工单系统
+msgid  Configure the wiki for this repository
+msgstr 配置本仓库的维基
+msgid  Interwiki Map
+msgstr 跨维基映射
+msgid  Mapping keywords for interwiki links
+msgstr 跨维基链接的关键字映射
+msgid  Configure the chatroom
+msgstr 配置聊天室
+msgid  Forum config and metrics
+msgstr 论坛配置与统计
+msgid  Configure the built-in search engine
+msgstr 配置内置搜索引擎
+msgid  URL Aliases
+msgstr URL 别名
+msgid  Configure URL aliases
+msgstr 配置 URL 别名
+msgid  Notification
+msgstr 通知
+msgid  Automatic notifications of changes via outbound email
+msgstr 通过外发邮件自动通知变更
+msgid  Skins
+msgstr 皮肤
+msgid  Select and/or modify the web interface "skins"
+msgstr 选择或修改网页界面的“皮肤”
+msgid  Moderation
+msgstr 审核
+msgid  Enable/Disable requiring moderator approval of Wiki and/or Ticket changes and attachments.
+msgstr 启用或停用维基、工单的变更与附件需经版主批准的要求。
+msgid  Ad-Unit
+msgstr 广告单元
+msgid  Edit HTML text for an ad unit inserted after the menu bar
+msgstr 编辑插入在菜单栏之后的广告单元 HTML 文本
+msgid  URLs & Checkouts
+msgstr URL 与工作目录
+msgid  Show URLs used to access this repo and known check-outs
+msgstr 显示访问本仓库所用的 URL 以及已知的工作目录
+msgid  View the status of the expensive-page cache
+msgstr 查看高开销页面缓存的状态
+msgid  Logo
+msgstr 徽标
+msgid  Change the logo and background images for the server
+msgstr 更改本服务器的徽标与背景图片
+msgid  Shunned
+msgstr 已屏蔽
+msgid  Show artifacts that are shunned by this repository
+msgstr 显示被本仓库屏蔽的工件
+msgid  Log Files
+msgstr 日志文件
+msgid  A menu of available log files
+msgstr 可用日志文件的菜单
+msgid  Show all unversioned files held
+msgstr 显示保存的所有非版本化文件
+msgid  Repository Status Reports
+msgstr 仓库状态报表
+msgid  Sitemap
+msgstr 站点地图
+msgid  Links to miscellaneous pages
+msgstr 指向各类杂项页面的链接
+msgid  SQL
+msgstr SQL
+msgid  Enter raw SQL commands
+msgstr 输入原始 SQL 命令
+msgid  TH1
+msgstr TH1
+msgid  Enter raw TH1 commands
+msgstr 输入原始 TH1 命令
+
+# ------------------------------------------------------------------ site map
+msgid  %zHome Page
+msgstr %z首页
+msgid  %zFile Browser
+msgstr %z文件浏览器
+msgid  %zTree-view, Trunk Check-in
+msgstr %z树状视图，trunk 的签入
+msgid  %zFlat-view
+msgstr %z平铺视图
+msgid  %zFile ages for Trunk
+msgstr %ztrunk 的文件时间
+msgid  %zUnversioned Files
+msgstr %z非版本化文件
+msgid  %zProject Timeline
+msgstr %z项目时间线
+msgid  %zActivity Reports
+msgstr %z活动报表
+msgid  %zOther timelines
+msgstr %z其他时间线
+msgid  %zBranches
+msgstr %z分支
+msgid  %zTags
+msgstr %z标签
+msgid  %zLeaf Check-ins
+msgstr %z叶节点签入
+msgid  %zChat
+msgstr %z聊天
+msgid  %zRecent activity
+msgstr %z最近活动
+msgid  %zTickets/Bug Reports
+msgstr %z工单／缺陷报告
+msgid  %zList of Attachments
+msgstr %z附件列表
+msgid  %zWiki
+msgstr %z维基
+msgid  %zList of Wiki Pages
+msgstr %z维基页面列表
+msgid  %zList of All Wiki Pages
+msgstr %z全部维基页面列表
+msgid  %zList of All Tech-notes
+msgstr %z全部技术笔记列表
+msgid  %zWiki Sandbox
+msgstr %z维基沙盒
+msgid  %zPikchr Sandbox
+msgstr %zPikchr 沙盒
+msgid  %zLogout from %h
+msgstr %z退出 %h 的登录
+msgid  %zChange Password for %h
+msgstr %z修改 %h 的密码
+msgid  %zCookies
+msgstr %zCookie
+msgid  %zRepository Status
+msgstr %z仓库状态
+msgid  %zCollisions on hash prefixes
+msgstr %z哈希前缀冲突
+msgid  %zList of URLs used to access this repository
+msgstr %z访问本仓库所用的 URL 列表
+msgid  %zList of Artifacts
+msgstr %z工件列表
+msgid  %zHelp
+msgstr %z帮助
+msgid  %zWiki Formatting Rules
+msgstr %z维基格式规则
+msgid  %zMarkdown Formatting Rules
+msgstr %zMarkdown 格式规则
+msgid  %zAll "help" text on a single page
+msgstr %z单页显示全部帮助文本
+msgid  %zFilename suffix to MIME type map
+msgstr %z文件名后缀到 MIME 类型的映射
+msgid  %zSkins
+msgstr %z皮肤
+msgid  %zTest Pages
+msgstr %z测试页面
+msgid  %zSite Map
+msgstr %z站点地图
+msgid  %zRecent changes
+msgstr %z最近变更
+msgid  %zTend to pending moderation requests
+msgstr %z处理待审核请求
+msgid  %zMarkup style
+msgstr %z标记样式
+
+# ------------------------------------------------ check-in information links
+msgid  %zTarball
+msgstr %zTarball
+msgid  %zfamily
+msgstr %z家族
+msgid  %zfiles
+msgstr %z文件
+msgid  %zthis check-in
+msgstr %z本次签入
+msgid  %zmanifest
+msgstr %z清单
+msgid  %zUnified&nbsp;Diff
+msgstr %z统一差异
+msgid  %z Ignore&nbsp;Whitespace
+msgstr %z 忽略空白
+msgid  %z Patch
+msgstr %z 补丁
+msgid  %zMLink Table
+msgstr %zMLink 表
+msgid  %z [annotate]
+msgstr %z [逐行追溯]
+msgid  %z [blame]
+msgstr %z [追溯]
+msgid  %z[check-ins&nbsp;using]
+msgstr %z[使用此文件的签入]
+msgid  %s check-in %z%S
+msgstr %s 签入 %z%S
+
+# ------------------------------------------------------------------- tickets
+msgid  Enter a new ticket:
+msgstr 创建新工单：
+msgid  New ticket
+msgstr 新建工单
+msgid  All Tickets
+msgstr 全部工单
+msgid  Other options:
+msgstr 其他选项：
+msgid  New report format
+msgstr 新建报表格式
+msgid  Tend to pending moderation requests
+msgstr 处理待审核请求
+msgid  copy
+msgstr 复制
+msgid  edit
+msgstr 编辑
+msgid  sql
+msgstr SQL
+msgid  Table
+msgstr 表
+msgid  Specify the schema of the "ticket" table in the database.
+msgstr 指定数据库中 “ticket” 表的模式。
+msgid  How to display ticket status in the timeline
+msgstr 在时间线中如何显示工单状态
+msgid  Common
+msgstr 公共代码
+msgid  Common TH1 code run before all ticket processing.
+msgstr 在所有工单处理之前运行的公共 TH1 代码。
+msgid  The TH1 code run after a ticket is edited or created.
+msgstr 在工单被编辑或创建之后运行的 TH1 代码。
+msgid  New Ticket Page
+msgstr 新建工单页面
+msgid  HTML with embedded TH1 code for the "new ticket" webpage.
+msgstr “新建工单”网页的 HTML（内嵌 TH1 代码）。
+msgid  View Ticket Page
+msgstr 查看工单页面
+msgid  HTML with embedded TH1 code for the "view ticket" webpage.
+msgstr “查看工单”网页的 HTML（内嵌 TH1 代码）。
+msgid  Edit Ticket Page
+msgstr 编辑工单页面
+msgid  HTML with embedded TH1 code for the "edit ticket" webpage.
+msgstr “编辑工单”网页的 HTML（内嵌 TH1 代码）。
+msgid  Report List Page
+msgstr 报表列表页面
+msgid  HTML with embedded TH1 code for the "report list" webpage.
+msgstr “报表列表”网页的 HTML（内嵌 TH1 代码）。
+msgid  Report Template
+msgstr 报表模板
+msgid  The default ticket report format.
+msgstr 默认的工单报表格式。
+msgid  Key Template
+msgstr 图例模板
+msgid  The default color key for reports.
+msgstr 报表的默认颜色图例。
+
+# --------------------------------------------------- shunning and moderation
+msgid  Shunned Artifacts
+msgstr 已屏蔽的工件
+msgid  Shunned Artifacts:
+msgstr 已屏蔽的工件：
+msgid  no artifacts are shunned on this server
+msgstr 本服务器上没有被屏蔽的工件
+msgid  Review
+msgstr 审阅
+msgid  Accept
+msgstr 接受
+msgid  Rebuild
+msgstr 重建
+
+# ----------------------------------------------------------- privilege notes
+msgid  user can make arbitrary configuration changes. An
+msgstr 用户可以任意修改配置。带
+msgid  The "
+msgstr “
+msgid  " subscript suffix indicates the privileges of
+msgstr ” 下标后缀表示该权限继承自
+msgid  that are inherited by all logged-in users.
+msgstr ，所有已登录用户都会继承这些权限。
+msgid  that are inherited by all users with the
+msgstr ，凡拥有
+msgid  privilege.
+msgstr 权限的用户都会继承这些权限。
+msgid  user can delete anything at any time.
+msgstr 用户可以随时删除任何内容。
+msgid  privilege allows remote users to "push". The
+msgstr 权限允许远程用户执行 “push”。
+msgid  privilege allows remote users to "pull". The
+msgstr 权限允许远程用户执行 “pull”。
+msgid  privilege allows remote users to "clone".
+msgstr 权限允许远程用户执行 “clone”。
+msgid  privileges control access to wiki pages. The
+msgstr 权限控制对维基页面的访问。
+msgid  privileges control access to trouble tickets. The
+msgstr 权限控制对问题工单的访问。
+msgid  Users with the
+msgstr 拥有
+msgid  New Ticket
+msgstr 新建工单
+msgid  Append Ticket
+msgstr 追加工单
+msgid  Write Ticket
+msgstr 编辑工单
+msgid  Check-in
+msgstr 签入
+msgid  Check-out
+msgstr 签出
+msgid  Read
+msgstr 读取
+msgid  Hyperlink
+msgstr 超链接
+msgid  Zip
+msgstr Zip
+msgid  Attachment
+msgstr 附件
+msgid  Login is required for user
+msgstr 以下用户需要登录：
+msgid  No login is required for user
+msgstr 以下用户无需登录：
+msgid  . The capabilities of the
+msgstr 。以下用户的权限：
+msgid  is ignored.
+msgstr 会被忽略。
+msgid  user. Similarly, the
+msgstr 用户。同样地，
+msgid  , but less than a
+msgstr ，但少于
+msgid  , and
+msgstr ，以及
+msgid  and for
+msgstr ，以及
+msgid  but ON for
+msgstr ，但对以下用户开启：
+
+# ----------------------------------------------- interwiki and wiki settings
+msgid  The current interwiki tag map is as follows:
+msgstr 当前的跨维基标签映射如下：
+msgid  for details or to modify the interwiki tag map.
+msgstr 了解详情或修改跨维基标签映射。
+msgid  Markdown-formatted
+msgstr Markdown 格式的
+msgid  &rarr; checked-in files, embedded documentation
+msgstr &rarr; 已签入的文件、内嵌文档
+msgid  &rarr; forum posts
+msgstr &rarr; 论坛帖子
+msgid  &rarr; tickets
+msgstr &rarr; 工单
+msgid  &rarr; wiki pages
+msgstr &rarr; 维基页面
+msgid  when enabling,
+msgstr 启用时，
+msgid  This should
+msgstr 这项设置
+msgid  be used on a publicly editable wiki.
+msgstr 在任何人都可编辑的维基上使用。
+msgid  Use HTML as the wiki markup language. Wiki links will still be parsed but all other wiki formatting will be ignored.
+msgstr 使用 HTML 作为维基标记语言。维基链接仍会被解析，但其他所有维基格式都会被忽略。
+
+# ------------------------------------------------------ miscellaneous labels
+msgid  Server-specific settings that affect the
+msgstr 影响以下页面的服务器专有设置：
+msgid  webpage.
+msgstr 网页。
+msgid  The first term is text that appears on the menu.
+msgstr 第一项是显示在菜单上的文字。
+msgid  The first term is the display name of the /sitemap entry
+msgstr 第一项是 /sitemap 条目的显示名称
+msgid  dwell time
+msgstr 停留时间
+msgid  close time
+msgstr 关闭时间
+msgid  to "0" to disable tooltips.
+msgstr 设为 “0” 可停用提示框。
+msgid  This button is checked
+msgstr 此按钮被勾选
+msgid  The inbound TCP/IP connection is not from 127.0.0.1
+msgstr 入站 TCP/IP 连接并非来自 127.0.0.1
+msgid  The server is started using either of the
+msgstr 服务器是用下列任一命令启动的：
+msgid  commands without the "--localauth" option.
+msgstr 命令，且未使用 “--localauth” 选项。
+msgid  Permissions given to users that...
+msgstr 授予下列用户的权限……
+msgid  are users newly created by the administrator.
+msgstr 由管理员新建的用户。
+msgid  Recommended value: "u" for Reader.
+msgstr 推荐值：“u”，即只读用户。
+msgid  command or from the
+msgstr 命令，或来自
+msgid  If the request URI matches any of the following
+msgstr 如果请求 URI 匹配下列任意一项
+msgid  The "zip" covers itself and also /tarball and /sqlar.
+msgstr “zip” 标签涵盖自身，以及 /tarball 和 /sqlar。
+
+# ------------------------------------------------------- access control page
+msgid  Force the use of HTTPS by redirecting to HTTPS when an unencrypted request is received. This feature can be enabled for the Login page only, or for all pages.
+msgstr 收到未加密请求时重定向到 HTTPS，从而强制使用 HTTPS。此功能可以只对登录页面启用，也可以对所有页面启用。
+msgid  When enabled, the password sign-in is always required for web access. When disabled, unrestricted web access from 127.0.0.1 is allowed for the
+msgstr 启用后，网页访问始终需要密码登录。停用后，来自 127.0.0.1 的网页访问不受限制，适用于
+msgid  commands when the "--localauth" command line options is used, or from the
+msgstr 命令并使用了 “--localauth” 命令行选项时，或来自
+msgid  if a line containing the word "localauth" appears in the CGI script.
+msgstr ，前提是 CGI 脚本中出现了包含 “localauth” 一词的行。
+msgid  A password is always required if any one or more of the following are true:
+msgstr 只要满足下列任意一条，就始终需要密码：
+msgid  The server is started from CGI without the "localauth" keyword in the CGI script.
+msgstr 服务器由 CGI 启动，且 CGI 脚本中没有 “localauth” 关键字。
+msgid  The number of hours for which a login is valid. This must be a positive number. The default is 8766 hours which is approximately equal to a year. (Property: "cookie-expire")
+msgstr 登录保持有效的小时数。必须为正数。默认值为 8766 小时，约合一年。（属性：“cookie-expire”）
+msgid  Require a CAPTCHA for edit operations (appending, creating, or editing wiki or tickets or adding attachments to wiki or tickets) for users who are not logged in. (Property: "require-captcha")
+msgstr 对未登录的用户，编辑类操作（追加、创建或编辑维基与工单，或为维基与工单添加附件）需要通过验证码。（属性：“require-captcha”）
+msgid  Allow users to register themselves on the /register webpage. A self-registration creates a new entry in the USER table and perhaps also in the SUBSCRIBER table if email notification is enabled. (Property: "self-register")
+msgstr 允许用户在 /register 页面自助注册。自助注册会在 USER 表中新建一条记录；如果启用了邮件通知，还可能在 SUBSCRIBER 表中新建记录。（属性：“self-register”）
+msgid  Allow users to request that an email contains a hyperlink to a password reset page be sent to their email address of record. This enables forgetful users to recover their forgotten passwords without administrator intervention. (Property: "self-pw-reset")
+msgstr 允许用户请求向其登记的邮箱发送一封包含密码重置页面链接的邮件。这样健忘的用户无需管理员介入即可找回密码。（属性：“self-pw-reset”）
+msgid  The number of minutes for which an anonymous login cookie is valid. Set to zero to disable anonymous logins. (property: anon-cookie-lifespan)
+msgstr 匿名登录 Cookie 的有效分钟数。设为零可停用匿名登录。（属性：anon-cookie-lifespan）
+msgid  When enabled, a button appears on the login screen for user "anonymous" that will automatically fill in the CAPTCHA password. This is less secure than forcing the user to do it manually, but is probably secure enough and it is certainly more convenient for anonymous users. (Property: "auto-captcha")
+msgstr 启用后，登录界面上会为 “anonymous” 用户显示一个按钮，用于自动填入验证码密码。这不如要求用户手动输入安全，但通常已经足够安全，而且对匿名用户方便得多。（属性：“auto-captcha”）
+msgid  A comma-separated list of glob patterns for pages that are accessible without needing a login and using the privileges given by the "Default privileges" setting below.
+msgstr 以逗号分隔的 glob 模式列表，匹配的页面无需登录即可访问，并使用下面“默认权限”设置所给的权限。
+msgid  When enabled, the %h/test_env URL is available to all users. When disabled (the default) only users Admin and Setup can visit the /test_env page. (Property: "test_env_enable")
+msgstr 启用后，%h/test_env 这一 URL 对所有用户开放。停用时（默认）只有 Admin 和 Setup 用户可以访问 /test_env 页面。（属性：“test_env_enable”）
+msgid  When enabled, the %h/artifact_stats URL is available to all users. When disabled (the default) only users with check-in privilege may access the /artifact_stats page. (Property: "artifact_stats_enable")
+msgstr 启用后，%h/artifact_stats 这一 URL 对所有用户开放。停用时（默认）只有拥有签入权限的用户可以访问 /artifact_stats 页面。（属性：“artifact_stats_enable”）
+msgid  When enabled, if the REMOTE_USER environment variable is set to the login name of a valid user and no other login credentials are available, then the REMOTE_USER is accepted as an authenticated user. (Property: "remote_user_ok")
+msgstr 启用后，如果 REMOTE_USER 环境变量的值是某个有效用户的登录名，且没有其他登录凭据可用，则接受 REMOTE_USER 作为已认证用户。（属性：“remote_user_ok”）
+msgid  When enabled, allow the use of the HTTP_AUTHENTICATION environment variable or the "Authentication:" HTTP header to find the username and password. This is another way of supporting Basic Authentication. (Property: "http_authentication_ok")
+msgstr 启用后，允许通过 HTTP_AUTHENTICATION 环境变量或 “Authentication:” HTTP 头来获取用户名和密码。这是支持 Basic 认证的另一种方式。（属性：“http_authentication_ok”）
+
+# ------------------------------------------------- timeline preferences page
+msgid  In timeline displays, check-in comments are displayed literally, without any wiki or HTML interpretation. Use CSS to change display formatting features such as fonts and line-wrapping behavior. (Property: "timeline-plaintext")
+msgstr 在时间线中按字面显示签入备注，不做任何维基或 HTML 解释。字体、换行等显示格式请用 CSS 调整。（属性：“timeline-plaintext”）
+msgid  In timeline displays, check-in comments are displayed only through the first blank line. This is the traditional way to display comments in Git repositories (Property: "timeline-truncate-at-blank")
+msgstr 在时间线中，签入备注只显示到第一个空行为止。这是 Git 仓库显示备注的传统方式。（属性：“timeline-truncate-at-blank”）
+msgid  In timeline displays, newline characters in check-in comments force a line break on the display. (Property: "timeline-hard-newlines")
+msgstr 在时间线中，签入备注里的换行符会强制换行显示。（属性：“timeline-hard-newlines”）
+msgid  Fossil normally attempts to adjust the saturation and intensity of user-specified background colors on check-ins and branches so that the foreground text is easily readable on all skins. Enable this setting to omit that adjustment and use exactly the background color specified by users. (Property: "raw-bgcolor")
+msgstr Fossil 通常会调整用户为签入和分支指定的背景色的饱和度与明度，使前景文字在所有皮肤下都易于阅读。启用本设置将跳过该调整，完全使用用户指定的背景色。（属性：“raw-bgcolor”）
+msgid  Show times as UTC (also sometimes called Greenwich Mean Time (GMT) or Zulu) instead of in local time. On this server, local time is currently
+msgstr 以 UTC（有时也称格林尼治标准时间 GMT 或 Zulu 时间）显示时间，而不是本地时间。本服务器上的本地时间当前
+msgid  the same as UTC and so this setting will make no difference in the display.
+msgstr 与 UTC 相同，因此本设置不会改变显示效果。
+msgid  The default timeline viewing style, for when the user has not specified an alternative. (Property: "timeline-default-style")
+msgstr 用户未另行指定时使用的默认时间线视图样式。（属性：“timeline-default-style”）
+msgid  The maximum number of rows to show on a timeline in the absence of a user display preference cookie setting or an explicit n= query parameter. (Property: "timeline-default-length")
+msgstr 在没有用户显示偏好 Cookie 也没有显式 n= 查询参数时，时间线最多显示的行数。（属性：“timeline-default-length”）
+msgid  Should timeline entries for leaf check-ins be identified in the detail section. (Property: "timeline-mark-leaves")
+msgstr 是否在详情区标出属于叶节点签入的时间线条目。（属性：“timeline-mark-leaves”）
+msgid  The maximum length of a comment to be displayed in a timeline. "0" there is no length limit. (Property: "timeline-max-comment")
+msgstr 时间线中显示的备注最大长度。“0” 表示不限长度。（属性：“timeline-max-comment”）
+msgid  defines how long the mouse pointer should be stationary above an object of the graph before a tooltip appears.
+msgstr 指鼠标指针在图形对象上停留多久之后才会出现提示框。
+msgid  defines how long the mouse pointer can be away from an object before a tooltip is closed.
+msgstr 指鼠标指针离开对象多久之后提示框才会关闭。
+msgid  to "0" to keep tooltips visible until the mouse is clicked elsewhere.
+msgstr 设为 “0” 可让提示框一直显示，直到在别处点击鼠标为止。
+
+# -------------------------------------------------------- configuration page
+msgid  A brief project name so visitors know what this site is about. The project name will also be used as the RSS feed title. (Property: "project-name")
+msgstr 一个简短的项目名称，让访问者知道本站是做什么的。项目名称同时会用作 RSS 源的标题。（属性：“project-name”）
+msgid  Describe your project. This will be used in page headers for search engines, the repository listing and a short RSS description. (Property: "project-description")
+msgstr 描述你的项目。此描述会用于面向搜索引擎的页面头部、仓库列表以及简短的 RSS 描述。（属性：“project-description”）
+msgid  Enter the pathname of the page to display when the "Home" menu option is selected and when no pathname is specified in the URL. For example, if you visit the url:
+msgstr 输入选择“首页”菜单项时、以及 URL 中未指定路径时要显示的页面路径。例如，如果你访问下面这个 URL：
+msgid  And you have specified an index page of "/home" the above will automatically redirect to:
+msgstr 而你把首页指定为 “/home”，上面的地址就会自动重定向到：
+msgid  The default "/home" page displays a Wiki page with the same name as the Project Name specified above. Some sites prefer to redirect to a documentation page (ex: "/doc/trunk/index.wiki") or to "/timeline".
+msgstr 默认的 “/home” 页面会显示一个与上面所设项目名称同名的维基页面。有些站点更愿意重定向到文档页面（例如 “/doc/trunk/index.wiki”）或 “/timeline”。
+msgid  This setting should be a TCL list. Each set of four consecutive values defines a single main menu item:
+msgstr 本设置应为一个 TCL 列表。每四个连续的值定义一个主菜单项：
+msgid  The second term is a hyperlink to take when a user clicks on the entry. Hyperlinks that start with "/" are relative to the repository root.
+msgstr 第二项是用户点击该条目时跳转的链接。以 “/” 开头的链接相对于仓库根目录。
+msgid  This setting should be a TCL list divided into triples. Each triple defines a new entry:
+msgstr 本设置应为一个按三元组划分的 TCL 列表。每个三元组定义一个新条目：
+msgid  The default value is blank, meaning no added entries. (Property: sitemap-extra)
+msgstr 默认值为空，表示不添加任何条目。（属性：sitemap-extra）
+
+# ----------------------------------------------------------------- skin page
+msgid  Customize the look of this Fossil repository by making changes to the CSS, Header, Footer, and Detail Settings in one of nine "draft" configurations. Then, after verifying that all is working correctly, publish the draft to become the new main Skin. Users can select a skin of their choice from the built-in ones or the locally-edited one via
+msgstr 通过修改九套“草稿”配置之一中的 CSS、页眉、页脚和细节设置来自定义本 Fossil 仓库的外观。确认一切正常之后，把该草稿发布为新的主皮肤。用户可以自行选择内置皮肤或本地编辑的皮肤，入口是
+msgid  The main skin of Fossil cannot be edited directly. Instead, edits are made to one of nine draft skins. A draft skin can then be published to become the default skin. Nine separate drafts are available to facilitate A/B testing.
+msgstr Fossil 的主皮肤无法直接编辑，而是要编辑九套草稿皮肤之一，再把草稿发布为默认皮肤。提供九套独立草稿是为了方便做 A/B 测试。
+msgid  As an administrator, you can make any edits you like to this or any other skin. You can also authorize other users to edit this skin. Any user whose login name matches the comma-separated list of GLOB expressions below is given special permission to edit the draft%d skin:
+msgstr 作为管理员，你可以随意编辑本皮肤或任何其他皮肤，也可以授权其他用户编辑本皮肤。登录名与下面这个以逗号分隔的 GLOB 表达式列表相匹配的用户，将获得编辑 draft%d 皮肤的特别权限：
+msgid  To test this draft skin, insert text "/draft%d/" just before the operation name in the URL. Here are a few links to try:
+msgstr 要测试这套草稿皮肤，请在 URL 中的操作名之前插入 “/draft%d/”。下面是几个可以试试的链接：
+msgid  When the draft%d skin is ready for production use, make it the default skin by clicking the acknowledgements and pressing the button below:
+msgstr 当 draft%d 皮肤可以正式使用时，勾选下面的确认项并按下按钮，即可把它设为默认皮肤：
+
+# ------------------------------------------------- search and robot settings
+msgid  The SQLite search index is disabled. All searching will be a full-text scan. This usually works fine, but can be slow for larger repositories.
+msgstr SQLite 搜索索引已停用，所有搜索都将进行全文扫描。这通常没问题，但在较大的仓库上可能很慢。
+msgid  Make this setting "off" to disable all robot restrictions, or "*" to exclude robots from all pages other than "/login" and "/xfer". (Property:
+msgstr 把本设置改为 “off” 可停用全部机器人限制；改为 “*” 则除 “/login” 和 “/xfer” 之外的所有页面都禁止机器人访问。（属性：
+msgid  Usually the tag should exactly match the page name. Exceptions:
+msgstr 通常标签应与页面名称完全一致。例外情况：
+msgid  The "diff" tag covers all diffing pages such as /vdiff, /fdiff, and /vpatch.
+msgstr “diff” 标签涵盖 /vdiff、/fdiff、/vpatch 等所有差异页面。
+msgid  The "annotate" tag covers /annotate and also /blame and /praise.
+msgstr “annotate” 标签涵盖 /annotate，以及 /blame 和 /praise。
+
+# ------------------------------------------------------- security audit page
+msgid  WARNING: Device "/dev/urandom" is not available for reading. This means that the pseudo-random number generator used by SQLite will be poorly seeded.
+msgstr 警告：设备 “/dev/urandom” 无法读取。这意味着 SQLite 使用的伪随机数生成器的种子质量很差。
+msgid  Sensitive material such as login passwords can be sent over an unencrypted connection. Fix this by changing the "Redirect to HTTPS" setting on the
+msgstr 登录密码等敏感信息可能通过未加密的连接传输。修复方法是修改下列页面上的 “Redirect to HTTPS” 设置：
+msgid  page to the approximate the number of available cores on your server, or maybe just a little less.
+msgstr 页面，设为服务器可用核心数左右，或略小一些。
+
+# ------------------------------------------------------------- timeline rows
+msgid  %scheck-in:&nbsp;%z
+msgstr %s签入：%z
+msgid  technote:&nbsp;
+msgstr 技术笔记：
+msgid  artifact:&nbsp;%z%S
+msgstr 工件：%z%S
+msgid  user:&nbsp;%z%h
+msgstr 用户：%z%h
+msgid  tags:&nbsp;%s
+msgstr 标签：%s
+msgid  leaf&nbsp;
+msgstr 叶节点 
+msgid  closed&nbsp;
+msgstr 已关闭 
+msgid  self&nbsp;
+msgstr 本机 
+msgid  Closed-Leaf
+msgstr 已关闭的叶节点
+msgid  %h @ %h on %s (
+msgstr %h @ %h 于 %s (
