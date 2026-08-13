@@ -426,6 +426,7 @@ SRC   = "$(OX)\add_.c" \
         "$(OX)\http_socket_.c" \
         "$(OX)\http_ssl_.c" \
         "$(OX)\http_transport_.c" \
+        "$(OX)\i18n_.c" \
         "$(OX)\import_.c" \
         "$(OX)\info_.c" \
         "$(OX)\interwiki_.c" \
@@ -603,6 +604,7 @@ EXTRA_FILES   = "$(SRCDIR)\..\extsrc\pikchr-worker.js" \
         "$(SRCDIR)\graph.js" \
         "$(SRCDIR)\hbmenu.js" \
         "$(SRCDIR)\href.js" \
+        "$(SRCDIR)\locale\zh-CN.txt" \
         "$(SRCDIR)\login.js" \
         "$(SRCDIR)\markdown.md" \
         "$(SRCDIR)\menu.js" \
@@ -697,6 +699,7 @@ OBJ   = "$(OX)\add$O" \
         "$(OX)\http_socket$O" \
         "$(OX)\http_ssl$O" \
         "$(OX)\http_transport$O" \
+        "$(OX)\i18n$O" \
         "$(OX)\import$O" \
         "$(OX)\info$O" \
         "$(OX)\interwiki$O" \
@@ -949,6 +952,7 @@ APPTARGETS = $(APPTARGETS) openssl
 	echo "$(OX)\http_socket.obj" >> $@
 	echo "$(OX)\http_ssl.obj" >> $@
 	echo "$(OX)\http_transport.obj" >> $@
+	echo "$(OX)\i18n.obj" >> $@
 	echo "$(OX)\import.obj" >> $@
 	echo "$(OX)\info.obj" >> $@
 	echo "$(OX)\interwiki.obj" >> $@
@@ -1243,6 +1247,7 @@ realclean: clean
 	echo "$(SRCDIR)\graph.js" >> $@
 	echo "$(SRCDIR)\hbmenu.js" >> $@
 	echo "$(SRCDIR)\href.js" >> $@
+	echo "$(SRCDIR)\locale/zh-CN.txt" >> $@
 	echo "$(SRCDIR)\login.js" >> $@
 	echo "$(SRCDIR)\markdown.md" >> $@
 	echo "$(SRCDIR)\menu.js" >> $@
@@ -1629,6 +1634,12 @@ realclean: clean
 	$(TCC) /Fo$@ /Fd$(@D)\ -c "$(OX)\http_transport_.c"
 
 "$(OX)\http_transport_.c" : "$(SRCDIR)\http_transport.c"
+	"$(OBJDIR)\translate$E" $** > $@
+
+"$(OX)\i18n$O" : "$(OX)\i18n_.c" "$(OX)\i18n.h"
+	$(TCC) /Fo$@ /Fd$(@D)\ -c "$(OX)\i18n_.c"
+
+"$(OX)\i18n_.c" : "$(SRCDIR)\i18n.c"
 	"$(OBJDIR)\translate$E" $** > $@
 
 "$(OX)\import$O" : "$(OX)\import_.c" "$(OX)\import.h"
@@ -2240,6 +2251,7 @@ realclean: clean
 			"$(OX)\http_socket_.c":"$(OX)\http_socket.h" \
 			"$(OX)\http_ssl_.c":"$(OX)\http_ssl.h" \
 			"$(OX)\http_transport_.c":"$(OX)\http_transport.h" \
+			"$(OX)\i18n_.c":"$(OX)\i18n.h" \
 			"$(OX)\import_.c":"$(OX)\import.h" \
 			"$(OX)\info_.c":"$(OX)\info.h" \
 			"$(OX)\interwiki_.c":"$(OX)\interwiki.h" \

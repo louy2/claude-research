@@ -51,11 +51,11 @@ void setup_menu_entry(
 ){
   @ <tr><td valign="top" align="right">
   if( zLink && zLink[0] ){
-    @ <a href="%s(zLink)"><nobr>%h(zTitle)</nobr></a>
+    @ <a href="%s(zLink)"><nobr>%h(i18n_text(zTitle))</nobr></a>
   }else{
-    @ <nobr>%h(zTitle)</nobr>
+    @ <nobr>%h(i18n_text(zTitle))</nobr>
   }
-  @ </td><td width="5"></td><td valign="top">%s(zDesc)</td></tr>
+  @ </td><td width="5"></td><td valign="top">%s(i18n_markup(zDesc))</td></tr>
 }
 
 

@@ -75,6 +75,7 @@ SRC = \
   $(SRCDIR)/http_socket.c \
   $(SRCDIR)/http_ssl.c \
   $(SRCDIR)/http_transport.c \
+  $(SRCDIR)/i18n.c \
   $(SRCDIR)/import.c \
   $(SRCDIR)/info.c \
   $(SRCDIR)/interwiki.c \
@@ -252,6 +253,7 @@ EXTRA_FILES = \
   $(SRCDIR)/graph.js \
   $(SRCDIR)/hbmenu.js \
   $(SRCDIR)/href.js \
+  $(SRCDIR)/locale/zh-CN.txt \
   $(SRCDIR)/login.js \
   $(SRCDIR)/markdown.md \
   $(SRCDIR)/menu.js \
@@ -346,6 +348,7 @@ TRANS_SRC = \
   $(OBJDIR)/http_socket_.c \
   $(OBJDIR)/http_ssl_.c \
   $(OBJDIR)/http_transport_.c \
+  $(OBJDIR)/i18n_.c \
   $(OBJDIR)/import_.c \
   $(OBJDIR)/info_.c \
   $(OBJDIR)/interwiki_.c \
@@ -498,6 +501,7 @@ OBJ = \
  $(OBJDIR)/http_socket.o \
  $(OBJDIR)/http_ssl.o \
  $(OBJDIR)/http_transport.o \
+ $(OBJDIR)/i18n.o \
  $(OBJDIR)/import.o \
  $(OBJDIR)/info.o \
  $(OBJDIR)/interwiki.o \
@@ -846,6 +850,7 @@ $(OBJDIR)/headers:	$(OBJDIR)/page_index.h $(OBJDIR)/builtin_data.h $(OBJDIR)/mak
 	$(OBJDIR)/http_socket_.c:$(OBJDIR)/http_socket.h \
 	$(OBJDIR)/http_ssl_.c:$(OBJDIR)/http_ssl.h \
 	$(OBJDIR)/http_transport_.c:$(OBJDIR)/http_transport.h \
+	$(OBJDIR)/i18n_.c:$(OBJDIR)/i18n.h \
 	$(OBJDIR)/import_.c:$(OBJDIR)/import.h \
 	$(OBJDIR)/info_.c:$(OBJDIR)/info.h \
 	$(OBJDIR)/interwiki_.c:$(OBJDIR)/interwiki.h \
@@ -1416,6 +1421,14 @@ $(OBJDIR)/http_transport.o:	$(OBJDIR)/http_transport_.c $(OBJDIR)/http_transport
 	$(XTCC) -o $(OBJDIR)/http_transport.o -c $(OBJDIR)/http_transport_.c
 
 $(OBJDIR)/http_transport.h:	$(OBJDIR)/headers
+
+$(OBJDIR)/i18n_.c:	$(SRCDIR)/i18n.c $(OBJDIR)/translate
+	$(OBJDIR)/translate $(SRCDIR)/i18n.c >$@
+
+$(OBJDIR)/i18n.o:	$(OBJDIR)/i18n_.c $(OBJDIR)/i18n.h $(SRCDIR)/config.h
+	$(XTCC) -o $(OBJDIR)/i18n.o -c $(OBJDIR)/i18n_.c
+
+$(OBJDIR)/i18n.h:	$(OBJDIR)/headers
 
 $(OBJDIR)/import_.c:	$(SRCDIR)/import.c $(OBJDIR)/translate
 	$(OBJDIR)/translate $(SRCDIR)/import.c >$@

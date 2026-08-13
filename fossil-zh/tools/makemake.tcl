@@ -108,6 +108,7 @@ set src {
   http
   http_socket
   http_transport
+  i18n
   import
   info
   interwiki
@@ -217,6 +218,7 @@ set extra_files {
   merge.tcl
   markdown.md
   wiki.wiki
+  locale/*.txt
   *.js
   default.css
   style.*.css

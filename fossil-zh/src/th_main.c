@@ -368,6 +368,26 @@ static void sendText(Blob *pOut, const char *z, int n, int encode){
 }
 
 /*
+** Send the literal text of a TH1 template - the boilerplate of a skin
+** header or footer, as opposed to anything substituted into it.  That text
+** is part of the user interface, so localize it on the way out.  See i18n.c.
+*/
+static void sendLiteral(Blob *pOut, const char *z, int n){
+  char *zLocalized = 0;
+  if( enableOutput && n>0 && pOut==0 && pThOut==0
+   && g.cgiOutput && cgi_reply_is_html()
+  ){
+    zLocalized = i18n_fragment(z, TH1_LEN(n));
+  }
+  if( zLocalized ){
+    sendText(pOut, zLocalized, (int)strlen(zLocalized), 0);
+    fossil_free(zLocalized);
+  }else{
+    sendText(pOut, z, n, 0);
+  }
+}
+
+/*
 ** error-reporting counterpart of sendText().
 */
 static void sendError(Blob * pOut, const char *z, int n, int forceCgi){
@@ -497,7 +517,13 @@ static int putsCmd(
       return TH_ERROR;
     }
   }
-  sendText(0,(char*)argv[1], TH1_LEN(n), encode);
+  if( encode ){
+    sendText(0,(char*)argv[1], TH1_LEN(n), encode);
+  }else{
+    /* The TH1 "html" command emits raw markup, which in a skin script is
+    ** part of the user interface, so localize it like template text. */
+    sendLiteral(0,(char*)argv[1], TH1_LEN(n));
+  }
   return TH_OK;
 }
 
@@ -2927,7 +2953,7 @@ int Th_RenderToBlob(const char *z, Blob * pOut, u32 mFlags){
       const char *zVar;
       int nVar;
       int encode = 1;
-      sendText(pOut,z, i, 0);
+      sendLiteral(pOut,z, i);
       if( z[i+1]=='<' ){
         /* Variables of the form $<aaa> are html escaped */
         zVar = &z[i+2];
@@ -2949,7 +2975,7 @@ int Th_RenderToBlob(const char *z, Blob * pOut, u32 mFlags){
         sendText(pOut,(char*)zResult, n, encode);
       }
     }else if( z[i]=='<' && isBeginScriptTag(&z[i]) ){
-      sendText(pOut,z, i, 0);
+      sendLiteral(pOut,z, i);
       z += i+5;
       for(i=0; z[i] && (z[i]!='<' || !isEndScriptTag(&z[i])); i++){}
       if( g.thTrace ){
@@ -2974,7 +3000,7 @@ int Th_RenderToBlob(const char *z, Blob * pOut, u32 mFlags){
     zResult = (char*)Th_GetResult(g.interp, &n);
     sendError(pOut,zResult, n, 1);
   }else{
-    sendText(pOut,z, i, 0);
+    sendLiteral(pOut,z, i);
   }
   Th_SetOutputBlob(origOut);
   return rc;

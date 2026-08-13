@@ -2017,13 +2017,30 @@ void cgi_tag_query_parameter(const char *zName){
 }
 
 /*
+** Return true if the reply being generated is HTML.  Only HTML replies
+** are localized; RSS, JSON, plain text and file downloads are not.
+*/
+int cgi_reply_is_html(void){
+  return fossil_strncmp(zReplyMimeType, "text/html", 9)==0;
+}
+
+/*
+** Localize a format string that is about to be written to the reply.
+** Returns zFormat unchanged unless a translation applies.  See i18n.c.
+*/
+static const char *cgi_localize(const char *zFormat){
+  if( g.cgiOutput==0 || !cgi_reply_is_html() ) return zFormat;
+  return i18n_format(zFormat);
+}
+
+/*
 ** This routine works like "printf" except that it has the
 ** extra formatting capabilities such as %h and %t.
 */
 void cgi_printf(const char *zFormat, ...){
   va_list ap;
   va_start(ap,zFormat);
-  vxprintf(pContent,zFormat,ap);
+  vxprintf(pContent,cgi_localize(zFormat),ap);
   va_end(ap);
 }
 
@@ -2032,7 +2049,7 @@ void cgi_printf(const char *zFormat, ...){
 ** extra formatting capabilities such as %h and %t.
 */
 void cgi_vprintf(const char *zFormat, va_list ap){
-  vxprintf(pContent,zFormat,ap);
+  vxprintf(pContent,cgi_localize(zFormat),ap);
 }
 
 

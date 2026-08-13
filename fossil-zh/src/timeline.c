@@ -227,7 +227,7 @@ void timeline_extra(
       }
       cgi_printf("%scheck-in:&nbsp;%z<span class='timelineHash'>"
                  "%S</span></a> ",
-                  zPrefix, href("%R/info/%!S",zUuid),zUuid);
+                  i18n_markup(zPrefix), href("%R/info/%!S",zUuid),zUuid);
     }else if( zType[0]=='e' && tagid ){
       cgi_printf("technote:&nbsp;");
       hyperlink_to_event_tagid(tagid<0?-tagid:tagid);

@@ -666,7 +666,7 @@ char *style_csp(int toHeader){
 ** prepended.
 */
 static const char zDfltHeader[] =
-@ <html>
+@ <html lang="$html_lang">
 @ <head>
 @ <meta charset="UTF-8">
 @ <base href="$baseurl/$current_page">
@@ -771,6 +771,7 @@ const char *style_get_mainmenu(){
     }else{
       zMenu = db_get("mainmenu", style_default_mainmenu());
     }
+    zMenu = i18n_mainmenu(zMenu);
   }
   return zMenu;
 }
@@ -791,6 +792,7 @@ static void style_init_th1_vars(const char *zTitle){
   Th_MaybeStore("default_csp", zDfltCsp);
   fossil_free(zDfltCsp);
   Th_Store("nonce", zNonce);
+  Th_Store("html_lang", i18n_locale());
   Th_StoreUnsafe("project_name",
                  db_get("project-name","Unnamed Fossil Project"));
   Th_StoreUnsafe("project_description", db_get("project-description",""));
@@ -840,9 +842,10 @@ void style_header(const char *zTitleFormat, ...){
   char *zTitle;
   const char *zHeader = skin_get("header");
   login_check_credentials();
+  i18n_new_page();
 
   va_start(ap, zTitleFormat);
-  zTitle = vmprintf(zTitleFormat, ap);
+  zTitle = vmprintf(i18n_text(zTitleFormat), ap);
   va_end(ap);
 
   cgi_destination(CGI_HEADER);
@@ -1032,10 +1035,10 @@ void style_finish_page(){
         ** "sml" stands for submenu link.
         */
         if( p->zLink==0 ){
-          @ <span class="label sml-%s(zClass)">%h(p->zLabel)</span>
+          @ <span class="label sml-%s(zClass)">%h(i18n_text(p->zLabel))</span>
         }else{
           @ <a class="label sml-%s(zClass)" \
-          @  href="%h(p->zLink)">%h(p->zLabel)</a>
+          @  href="%h(p->zLink)">%h(i18n_text(p->zLabel))</a>
         }
       }
     }
@@ -1053,7 +1056,7 @@ void style_finish_page(){
       switch( aSubmenuCtrl[i].eType ){
         case FF_ENTRY:
           @ <span class='submenuctrl%s(zXtraClass) %s(zClass)'>\
-          @ &nbsp;%h(aSubmenuCtrl[i].zLabel)\
+          @ &nbsp;%h(i18n_text(aSubmenuCtrl[i].zLabel))\
           @ <input type='text' name='%s(zQPN)' value='%h(PD(zQPN, ""))' \
           if( aSubmenuCtrl[i].iSize<0 ){
             @ size='%d(-aSubmenuCtrl[i].iSize)' \
@@ -1070,7 +1073,7 @@ void style_finish_page(){
             @ <span class='%s(zXtraClass+1) %s(zClass)'>
           }
           if( aSubmenuCtrl[i].zLabel ){
-            @ &nbsp;%h(aSubmenuCtrl[i].zLabel)\
+            @ &nbsp;%h(i18n_text(aSubmenuCtrl[i].zLabel))\
           }
           @ <select class='submenuctrl %s(zClass)' size='1' name='%s(zQPN)' \
           @ id='submenuctrl-%d(i)'%s(zDisabled)>
@@ -1080,7 +1083,7 @@ void style_finish_page(){
             if( fossil_strcmp(zVal, zQPV)==0 ){
               @  selected\
             }
-            @ >%h(aSubmenuCtrl[i].azChoice[j+1])</option>
+            @ >%h(i18n_text(aSubmenuCtrl[i].azChoice[j+1]))</option>
           }
           @ </select>
           if( zXtraClass[0] ){
@@ -1096,12 +1099,12 @@ void style_finish_page(){
           if( isTrue ){
             @  selected\
           }
-          @ >%h(aSubmenuCtrl[i].zLabel)</option>
+          @ >%h(i18n_text(aSubmenuCtrl[i].zLabel))</option>
           @ <option value='0'\
           if( !isTrue ){
             @  selected\
           }
-          @ >%h(aSubmenuCtrl[i].zFalse)</option>
+          @ >%h(i18n_text(aSubmenuCtrl[i].zFalse))</option>
           @ </select>
           break;
         }
@@ -1116,7 +1119,7 @@ void style_finish_page(){
           }else{
             @ %s(zDisabled)>\
           }
-          @ %h(aSubmenuCtrl[i].zLabel)</label>
+          @ %h(i18n_text(aSubmenuCtrl[i].zLabel))</label>
           break;
         }
       }

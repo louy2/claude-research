@@ -86,6 +86,19 @@ const char *builtin_text(const char *zFilename){
 }
 
 /*
+** Return the number of built-in files, and the name of the i-th one.
+** The names are in lexicographical order.  builtin_file_name() returns
+** NULL if i is out of range.
+*/
+int builtin_file_count(void){
+  return count(aBuiltinFiles);
+}
+const char *builtin_file_name(int i){
+  if( i<0 || i>=count(aBuiltinFiles) ) return 0;
+  return aBuiltinFiles[i].zName;
+}
+
+/*
 ** COMMAND: test-builtin-list
 **
 ** If -verbose is used, it outputs a line at the end

@@ -1,0 +1,12 @@
+# Build products of "./configure && make".  Fossil's own ignore list lives in
+# .fossil-settings/ignore-glob; this file is the equivalent for the git
+# mirror of this fork.
+/Makefile
+/autoconfig.h
+/autosetup/jimsh0
+/bld/
+/config.log
+/fossil
+/fossil.exe
+/jimsh0
+*.o
