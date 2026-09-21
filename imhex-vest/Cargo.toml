@@ -1,0 +1,16 @@
+[workspace]
+members = ["tree-sitter-hexpat", "hexpat"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "CC0-1.0"
+repository = "https://github.com/louy2/claude-research"
+
+[workspace.dependencies]
+vest_lib = "0.2.1"
+vstd = { version = "=0.0.0-2026-09-06-0133", default-features = false }
+tree-sitter = "0.27"
+
+[profile.release]
+debug = 1

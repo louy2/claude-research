@@ -1,0 +1,7 @@
+{
+  "grammars": [
+    { "name": "hexpat", "camelcase": "Hexpat", "title": "Hexpat", "scope": "source.hexpat", "path": ".", "file-types": ["hexpat", "pat"], "injection-regex": "^hexpat$" }
+  ],
+  "metadata": { "version": "0.1.0", "license": "CC0-1.0", "description": "Tree-sitter grammar for the ImHex pattern language", "authors": [{"name": "louy2"}] },
+  "bindings": { "rust": true, "c": false, "go": false, "node": false, "python": false, "swift": false }
+}
