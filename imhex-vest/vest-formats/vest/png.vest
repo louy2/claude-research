@@ -1,0 +1,45 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+!BIG_ENDIAN
+
+signature = {
+    highBit: u8,
+    png: [u8; 3],
+    dosLineEnding: [u8; 2],
+    dosEof: u8,
+    unixLineEnding: u8,
+}
+
+color_type = enum {
+    Grayscale = 0u8,
+    RGB = 2u8,
+    Palette = 3u8,
+    GrayscaleAlpha = 4u8,
+    RGBA = 6u8,
+    ...
+}
+
+ihdr = {
+    width: u32,
+    height: u32,
+    bitDepth: u8,
+    colorType: color_type,
+    compressionMethod: u8,
+    filterMethod: u8,
+    interlaceMethod: u8,
+}
+
+chunk = {
+    @length: u32,
+    @type_: [u8; 4],
+    ihdr: choose(@type_) {
+        [0x49, 0x48, 0x44, 0x52] => ihdr,
+        _ => [u8; @length],
+    },
+    crc: u32,
+}
+
+png = {
+    signature: signature,
+    chunks: Vec<chunk>,
+}
+

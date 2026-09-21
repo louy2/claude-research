@@ -1,0 +1,17 @@
+[package]
+name = "vest-formats"
+version = "0.1.0"
+description = "Verified parsers for popular binary formats, generated from hexpat patterns through the Vest DSL"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vest_lib = { workspace = true }
+vstd = { workspace = true, features = ["std"] }
+
+[dev-dependencies]
+hexpat = { path = "../hexpat" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)"] }

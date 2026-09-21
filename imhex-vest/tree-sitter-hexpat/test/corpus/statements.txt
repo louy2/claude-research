@@ -1,0 +1,155 @@
+================================================================================
+Control flow inside a struct
+================================================================================
+
+struct S {
+    u8 tag;
+    if (tag == 1) u8 a; else { u16 b; }
+    match (tag, 0) { (2 | 3 ... 5, _): u8 c; (_, _): break; }
+    try { u8 t; } catch { continue; }
+    u8 rest[while(!std::mem::eof())];
+    $ += 4;
+    padding[2];
+};
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (struct_definition
+    name: (identifier)
+    body: (block
+      (variable_declaration
+        type: (type
+          base: (builtin_type))
+        name: (identifier))
+      (if_statement
+        condition: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        consequence: (variable_declaration
+          type: (type
+            base: (builtin_type))
+          name: (identifier))
+        alternative: (block
+          (variable_declaration
+            type: (type
+              base: (builtin_type))
+            name: (identifier))))
+      (match_statement
+        value: (identifier)
+        value: (number_literal)
+        (match_case
+          (match_pattern
+            (binary_expression
+              left: (number_literal)
+              right: (number_literal))
+            (number_literal))
+          (match_pattern
+            (wildcard))
+          body: (variable_declaration
+            type: (type
+              base: (builtin_type))
+            name: (identifier)))
+        (match_case
+          (match_pattern
+            (wildcard))
+          (match_pattern
+            (wildcard))
+          body: (break_statement)))
+      (try_catch_statement
+        body: (block
+          (variable_declaration
+            type: (type
+              base: (builtin_type))
+            name: (identifier)))
+        handler: (block
+          (continue_statement)))
+      (array_declaration
+        type: (type
+          base: (builtin_type))
+        name: (identifier)
+        size: (while_size
+          condition: (unary_expression
+            operand: (call_expression
+              function: (scoped_identifier
+                (identifier)
+                (identifier)
+                (identifier))
+              arguments: (arguments)))))
+      (compound_assignment_statement
+        left: (dollar)
+        right: (number_literal))
+      (padding_declaration
+        size: (number_literal))))
+  (empty_statement))
+
+================================================================================
+Functions, namespaces and expressions
+================================================================================
+
+namespace auto ns {
+    fn f(ref auto x, u32 y = 3, auto ... rest) {
+        for (u8 i = 0, i < y, i += 1) { y = y ? be u32(i) : sizeof($); }
+        return x as u16 | addressof(parent.z) & typenameof(x);
+    };
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (namespace_definition
+    name: (identifier)
+    (function_definition
+      name: (identifier)
+      parameters: (parameter_list
+        (parameter
+          type: (type
+            base: (builtin_type))
+          name: (identifier))
+        (parameter
+          type: (type
+            base: (builtin_type))
+          name: (identifier)
+          default: (number_literal))
+        (parameter_pack
+          name: (identifier)))
+      body: (block
+        (for_statement
+          initializer: (for_variable_declaration
+            type: (type
+              base: (builtin_type))
+            name: (identifier)
+            value: (number_literal))
+          condition: (binary_expression
+            left: (identifier)
+            right: (identifier))
+          update: (for_compound_assignment
+            left: (identifier)
+            right: (number_literal))
+          body: (block
+            (assignment_statement
+              left: (identifier)
+              right: (ternary_expression
+                condition: (identifier)
+                consequence: (cast_expression
+                  endian: (endian)
+                  type: (builtin_type)
+                  value: (identifier))
+                alternative: (type_operator_expression
+                  argument: (dollar))))))
+        (return_statement
+          (binary_expression
+            left: (reinterpret_expression
+              value: (identifier)
+              type: (type
+                base: (builtin_type)))
+            right: (binary_expression
+              left: (type_operator_expression
+                argument: (member_expression
+                  object: (parent)
+                  member: (identifier)))
+              right: (type_operator_expression
+                argument: (type
+                  base: (custom_type
+                    name: (identifier)))))))))
+    (empty_statement)))

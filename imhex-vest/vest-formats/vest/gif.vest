@@ -1,0 +1,27 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+header = {
+    signature: [u8; 3],
+    version: [u8; 3],
+}
+
+screen_flags = bits {
+    globalColorTable: u1,
+    colorResolution: u3,
+    sortFlag: u1,
+    globalColorTableSize: u3,
+}
+
+logical_screen_descriptor = {
+    width: u16,
+    height: u16,
+    flags: screen_flags,
+    backgroundColorIndex: u8,
+    pixelAspectRatio: u8,
+}
+
+gif = {
+    header: header,
+    screen: logical_screen_descriptor,
+}
+

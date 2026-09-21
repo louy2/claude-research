@@ -1,0 +1,33 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+riff_header = {
+    riff: [u8; 4],
+    size: u32,
+    wave: [u8; 4],
+}
+
+format = enum {
+    PCM = 1u16,
+    IEEEFloat = 3u16,
+    ALaw = 6u16,
+    MuLaw = 7u16,
+    Extensible = 65534u16,
+    ...
+}
+
+fmt_chunk = {
+    id: [u8; 4],
+    size: u32,
+    format: format,
+    channels: u16,
+    sampleRate: u32,
+    byteRate: u32,
+    blockAlign: u16,
+    bitsPerSample: u16,
+}
+
+wav = {
+    riff: riff_header,
+    fmt: fmt_chunk,
+}
+

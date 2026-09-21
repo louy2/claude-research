@@ -1,0 +1,23 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+!BIG_ENDIAN
+
+channels = enum {
+    RGB = 3u8,
+    RGBA = 4u8,
+    ...
+}
+
+colorspace = enum {
+    SRGB = 0u8,
+    Linear = 1u8,
+    ...
+}
+
+qoi = {
+    const magic: [u8; 4] = [0x71, 0x6F, 0x69, 0x66],
+    width: u32,
+    height: u32,
+    channels: channels,
+    colorspace: colorspace,
+}
+

@@ -1,0 +1,17 @@
+[package]
+name = "hexpat"
+version = "0.1.0"
+description = "ImHex pattern language front end (tree-sitter) with an interpreter built on vest_lib and a Vest DSL emitter"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tree-sitter = { workspace = true }
+tree-sitter-hexpat = { path = "../tree-sitter-hexpat" }
+vest_lib = { workspace = true }
+vstd = { workspace = true }
+
+[[bin]]
+name = "hexpat"
+path = "src/bin/hexpat.rs"

@@ -1,0 +1,76 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+class = enum {
+    None = 0u8,
+    Elf32 = 1u8,
+    Elf64 = 2u8,
+    ...
+}
+
+data = enum {
+    None = 0u8,
+    Lsb = 1u8,
+    Msb = 2u8,
+    ...
+}
+
+ident = {
+    magic: [u8; 4],
+    class: class,
+    data: data,
+    version: u8,
+    osAbi: u8,
+    abiVersion: u8,
+    _pad1: [u8; 7],
+}
+
+object_type = enum {
+    None = 0u16,
+    Rel = 1u16,
+    Exec = 2u16,
+    Dyn = 3u16,
+    Core = 4u16,
+    ...
+}
+
+header32 = {
+    type_: object_type,
+    machine: u16,
+    version: u32,
+    entry: u32,
+    phoff: u32,
+    shoff: u32,
+    flags: u32,
+    ehsize: u16,
+    phentsize: u16,
+    phnum: u16,
+    shentsize: u16,
+    shnum: u16,
+    shstrndx: u16,
+}
+
+header64 = {
+    type_: object_type,
+    machine: u16,
+    version: u32,
+    entry: u64,
+    phoff: u64,
+    shoff: u64,
+    flags: u32,
+    ehsize: u16,
+    phentsize: u16,
+    phnum: u16,
+    shentsize: u16,
+    shnum: u16,
+    shstrndx: u16,
+}
+
+elf = {
+    @ident: ident,
+    header: choose(@ident.class) {
+        Elf32 => header32,
+        Elf64 => header64,
+        _ => Nothing,
+    },
+}
+

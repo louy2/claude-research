@@ -1,0 +1,30 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+image_type = enum {
+    Icon = 1u16,
+    Cursor = 2u16,
+    ...
+}
+
+header = {
+    reserved: u16,
+    type_: image_type,
+    count: u16,
+}
+
+dir_entry = {
+    width: u8,
+    height: u8,
+    colorCount: u8,
+    reserved: u8,
+    planes: u16,
+    bitCount: u16,
+    size: u32,
+    offset: u32,
+}
+
+ico = {
+    @header: header,
+    entries: [dir_entry; @header.count],
+}
+

@@ -1,0 +1,39 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+bitmap_file_header = {
+    signature: [u8; 2],
+    fileSize: u32,
+    reserved1: u16,
+    reserved2: u16,
+    pixelDataOffset: u32,
+}
+
+compression = enum {
+    RGB = 0u32,
+    RLE8 = 1u32,
+    RLE4 = 2u32,
+    Bitfields = 3u32,
+    JPEG = 4u32,
+    PNG = 5u32,
+    ...
+}
+
+bitmap_info_header = {
+    headerSize: u32,
+    width: u32,
+    height: u32,
+    planes: u16,
+    bitsPerPixel: u16,
+    compression: compression,
+    imageSize: u32,
+    xPixelsPerMeter: u32,
+    yPixelsPerMeter: u32,
+    colorsUsed: u32,
+    importantColors: u32,
+}
+
+bmp = {
+    file: bitmap_file_header,
+    info: bitmap_info_header,
+}
+

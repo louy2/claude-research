@@ -1,0 +1,22 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+posix_header = {
+    name: [u8; 100],
+    mode: [u8; 8],
+    uid: [u8; 8],
+    gid: [u8; 8],
+    size: [u8; 12],
+    mtime: [u8; 12],
+    checksum: [u8; 8],
+    typeflag: u8,
+    linkname: [u8; 100],
+    magic: [u8; 6],
+    version: [u8; 2],
+    uname: [u8; 32],
+    gname: [u8; 32],
+    devmajor: [u8; 8],
+    devminor: [u8; 8],
+    prefix: [u8; 155],
+    _pad1: [u8; 12],
+}
+

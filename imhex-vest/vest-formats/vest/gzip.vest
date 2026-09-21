@@ -1,0 +1,31 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+flags = bits {
+    _pad1: u3,
+    comment: u1,
+    name: u1,
+    extra: u1,
+    hcrc: u1,
+    text: u1,
+}
+
+os = enum {
+    Fat = 0u8,
+    Amiga = 1u8,
+    Vms = 2u8,
+    Unix = 3u8,
+    Macintosh = 7u8,
+    Ntfs = 11u8,
+    ...
+}
+
+gzip = {
+    id1: u8,
+    id2: u8,
+    compressionMethod: u8,
+    flags: flags,
+    mtime: u32,
+    extraFlags: u8,
+    os: os,
+}
+

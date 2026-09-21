@@ -3015,8 +3015,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
     case 21:
       if (lookahead == '\\') ADVANCE(19);
       if (lookahead != 0 &&
-          lookahead != '\n' &&
-          lookahead != '\'') ADVANCE(4);
+          lookahead != '\n') ADVANCE(4);
       END_STATE();
     case 22:
       if (lookahead == '+' ||

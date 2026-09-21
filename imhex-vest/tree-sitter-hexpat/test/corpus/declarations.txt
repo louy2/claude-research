@@ -1,0 +1,126 @@
+================================================================================
+Struct with attributes, inheritance and a placed member
+================================================================================
+
+struct Header : Base {
+    u32 magic [[comment("magic")]];
+    be u16 count;
+    u8 data[count] @ 0x10 [[sealed]];
+} [[name("hdr")]];
+
+Header hdr @ 0x00;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (struct_definition
+    name: (identifier)
+    parents: (custom_type
+      name: (identifier))
+    body: (block
+      (variable_declaration
+        type: (type
+          base: (builtin_type))
+        name: (identifier)
+        attributes: (attribute_list
+          (attribute
+            name: (identifier)
+            arguments: (arguments
+              (string_literal)))))
+      (variable_declaration
+        type: (type
+          endian: (endian)
+          base: (builtin_type))
+        name: (identifier))
+      (array_declaration
+        type: (type
+          base: (builtin_type))
+        name: (identifier)
+        size: (identifier)
+        placement: (placement
+          address: (number_literal))
+        attributes: (attribute_list
+          (attribute
+            name: (identifier)))))
+    attributes: (attribute_list
+      (attribute
+        name: (identifier)
+        arguments: (arguments
+          (string_literal)))))
+  (empty_statement)
+  (variable_declaration
+    type: (type
+      base: (custom_type
+        name: (identifier)))
+    name: (identifier)
+    placement: (placement
+      address: (number_literal))))
+
+================================================================================
+Enum, bitfield, union and using
+================================================================================
+
+enum Kind : u8 { A = 1, B, C = 0x10 ... 0x1F, };
+bitfield Flags { a : 3; signed b : 2; padding : 3; bool f : 1; };
+union U { u8 x; u16 y; };
+using Alias<T> = Pair<T, 4>;
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (enum_definition
+    name: (identifier)
+    type: (type
+      base: (builtin_type))
+    (enum_entry
+      name: (identifier)
+      value: (number_literal))
+    (enum_entry
+      name: (identifier))
+    (enum_entry
+      name: (identifier)
+      value: (number_literal)
+      end: (number_literal)))
+  (empty_statement)
+  (bitfield_definition
+    name: (identifier)
+    body: (block
+      (bitfield_field
+        name: (identifier)
+        size: (number_literal))
+      (bitfield_field
+        name: (identifier)
+        size: (number_literal))
+      (bitfield_padding
+        size: (number_literal))
+      (bitfield_sized_field
+        type: (type
+          base: (builtin_type))
+        name: (identifier)
+        size: (number_literal))))
+  (empty_statement)
+  (union_definition
+    name: (identifier)
+    body: (block
+      (variable_declaration
+        type: (type
+          base: (builtin_type))
+        name: (identifier))
+      (variable_declaration
+        type: (type
+          base: (builtin_type))
+        name: (identifier))))
+  (empty_statement)
+  (using_declaration
+    name: (identifier)
+    template_parameters: (template_parameters
+      (template_parameter
+        type_name: (identifier)))
+    type: (type
+      base: (custom_type
+        name: (identifier)
+        template_arguments: (template_arguments
+          (type
+            base: (custom_type
+              name: (identifier)))
+          (number_literal))))))

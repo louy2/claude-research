@@ -4152,6 +4152,10 @@
                 "value": "[^'\\\\\\n]"
               },
               {
+                "type": "STRING",
+                "value": "'"
+              },
+              {
                 "type": "PATTERN",
                 "value": "\\\\[^xuU\\n]"
               },

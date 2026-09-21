@@ -1,0 +1,32 @@
+// Generated from an ImHex pattern by hexpat's Vest emitter.
+
+method = enum {
+    Stored = 0u16,
+    Deflated = 8u16,
+    Bzip2 = 12u16,
+    Lzma = 14u16,
+    Zstd = 93u16,
+    ...
+}
+
+local_file_header = {
+    signature: [u8; 4],
+    version: u16,
+    flags: u16,
+    method: method,
+    modTime: u16,
+    modDate: u16,
+    crc32: u32,
+    @compressedSize: u32,
+    uncompressedSize: u32,
+    @nameLength: u16,
+    @extraLength: u16,
+    name: [u8; @nameLength],
+    extra: [u8; @extraLength],
+    data: [u8; @compressedSize],
+}
+
+zip = {
+    entries: Vec<local_file_header>,
+}
+

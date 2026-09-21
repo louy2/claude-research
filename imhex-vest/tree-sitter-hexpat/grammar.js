@@ -661,10 +661,12 @@ export default grammar({
       /[0-9][0-9']*([eE][+-]?[0-9]+)?[uUfFdD]?/,
     )),
 
+    // `'''` (an unescaped quote) is accepted by the reference lexer.
     char_literal: _ => token(seq(
       "'",
       choice(
         /[^'\\\n]/,
+        "'",
         /\\[^xuU\n]/,
         /\\x[0-9a-fA-F]{2}/,
         /\\u[0-9a-fA-F]{4}/,
