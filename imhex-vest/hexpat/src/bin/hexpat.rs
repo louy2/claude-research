@@ -2,8 +2,12 @@
 //!
 //! ```text
 //! hexpat parse <pattern.hexpat> [-I dir]...          check syntax, print statement summary
-//! hexpat run <pattern.hexpat> <data> [-I dir]... [--json] [--format] [--hidden] [--max-entries N]
+//! hexpat run <pattern.hexpat> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N]
+//! hexpat format -p <pattern.hexpat> -i <data> [-I dir]... [-f json] [-m] [-o out.json]
 //! hexpat emit-vest <pattern.hexpat> [-I dir]... [-o out.vest]
+//!
+//! `--json` and `format -f json` produce the same JSON as the reference
+//! implementation's `plcli format -f json`; `-m` adds its metadata fields.
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -13,7 +17,7 @@ use hexpat::interp::dump::DumpOptions;
 use hexpat::{Runtime, Value};
 
 fn usage() -> ExitCode {
-    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]");
+    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]");
     ExitCode::from(2)
 }
 
@@ -21,6 +25,11 @@ struct Args {
     positional: Vec<String>,
     includes: Vec<PathBuf>,
     json: bool,
+    tree_json: bool,
+    meta: bool,
+    pattern_opt: Option<String>,
+    input_opt: Option<String>,
+    formatter: String,
     format: bool,
     hidden: bool,
     max_entries: usize,
@@ -35,6 +44,11 @@ fn parse_args() -> Option<Args> {
         positional: Vec::new(),
         includes: Vec::new(),
         json: false,
+        tree_json: false,
+        meta: false,
+        pattern_opt: None,
+        input_opt: None,
+        formatter: "json".to_string(),
         format: false,
         hidden: false,
         max_entries: 64,
@@ -48,6 +62,11 @@ fn parse_args() -> Option<Args> {
         match arg.as_str() {
             "-I" | "--include" => a.includes.push(PathBuf::from(it.next()?)),
             "--json" => a.json = true,
+            "--tree-json" => a.tree_json = true,
+            "-m" | "--meta" | "--metadata" => a.meta = true,
+            "-p" | "--pattern" => a.pattern_opt = Some(it.next()?),
+            "-i" | "--input" => a.input_opt = Some(it.next()?),
+            "-f" | "--formatter" => a.formatter = it.next()?,
             "--format" => a.format = true,
             "--hidden" => a.hidden = true,
             "--quiet" | "-q" => a.quiet = true,
@@ -66,6 +85,14 @@ fn parse_args() -> Option<Args> {
     Some(a)
 }
 
+/// Writes to stdout, ignoring a closed pipe (for example `| head`).
+fn emit(text: &str) {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    let _ = out.write_all(text.as_bytes());
+    let _ = out.flush();
+}
+
 fn main() -> ExitCode {
     // Pattern evaluation recurses per nesting level; give it a large stack.
     let child = std::thread::Builder::new().stack_size(1 << 30).spawn(real_main).expect("spawn main thread");
@@ -80,6 +107,7 @@ fn real_main() -> ExitCode {
     match args.positional[0].as_str() {
         "parse" => cmd_parse(&args),
         "run" => cmd_run(&args),
+        "format" => cmd_format(&args),
         "emit-vest" => cmd_emit(&args),
         _ => usage(),
     }
@@ -170,16 +198,22 @@ fn cmd_run(args: &Args) -> ExitCode {
     let result = rt.run_source(&source, path.parent());
     let opts = DumpOptions { formatted: args.format, show_hidden: args.hidden, max_entries: args.max_entries };
     for line in &rt.console {
-        println!("[out] {}", line);
+        emit(&format!("[out] {}\n", line));
     }
     for w in &rt.warnings {
         eprintln!("[warn] {}", w);
     }
     if !args.quiet {
-        let text = if args.json { hexpat::interp::dump_json(&mut rt, &opts) } else { hexpat::interp::dump_text(&mut rt, &opts) };
-        print!("{}", text);
-        if args.json {
-            println!();
+        let text = if args.json {
+            hexpat::interp::dump_json_imhex(&mut rt, args.meta)
+        } else if args.tree_json {
+            hexpat::interp::dump_json(&mut rt, &opts)
+        } else {
+            hexpat::interp::dump_text(&mut rt, &opts)
+        };
+        emit(&text);
+        if args.json || args.tree_json {
+            emit("\n");
         }
     }
     match result {
@@ -189,6 +223,49 @@ fn cmd_run(args: &Args) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+/// `hexpat format -p PATTERN -i DATA [-f json] [-m] [-o FILE]`, mirroring
+/// `plcli format`.
+fn cmd_format(args: &Args) -> ExitCode {
+    let pattern = args.pattern_opt.clone().or_else(|| args.positional.get(1).cloned());
+    let input = args.input_opt.clone().or_else(|| args.positional.get(2).cloned());
+    let (Some(pattern), Some(input)) = (pattern, input) else { return usage() };
+    if args.formatter != "json" {
+        eprintln!("Invalid formatter. Valid formatters are: [json]");
+        return ExitCode::from(2);
+    }
+    let path = Path::new(&pattern);
+    let source = match read_pattern(path) {
+        Ok(s) => s,
+        Err(c) => return c,
+    };
+    let data = match std::fs::read(&input) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Failed to open file '{}': {}", input, e);
+            return ExitCode::from(1);
+        }
+    };
+    let mut rt = Runtime::new(data);
+    for inc in &args.includes {
+        rt.add_include_path(inc);
+    }
+    if let Err(e) = rt.run_source(&source, path.parent()) {
+        eprintln!("error: {}", e);
+        return ExitCode::from(1);
+    }
+    let text = hexpat::interp::dump_json_imhex(&mut rt, args.meta);
+    match &args.output {
+        Some(o) => {
+            if let Err(e) = std::fs::write(o, &text) {
+                eprintln!("Failed to create output file: {}: {}", o.display(), e);
+                return ExitCode::from(1);
+            }
+        }
+        None => emit(&text),
+    }
+    ExitCode::SUCCESS
 }
 
 fn cmd_emit(args: &Args) -> ExitCode {

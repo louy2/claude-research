@@ -78,7 +78,8 @@ fn arrays_fixed_unsized_and_while() {
     let rt = run(src, &data);
     assert_eq!(member(&rt, "s.vals").borrow().entry_count(), Some(2));
     assert_eq!(member(&rt, "s.vals").borrow().size, 4);
-    assert_eq!(value(&rt, "s.name").as_str().unwrap(), "hi");
+    // Like the reference, the value of an unsized array keeps its NUL terminator.
+    assert_eq!(value(&rt, "s.name").as_str().unwrap(), "hi\0");
     assert_eq!(member(&rt, "s.name").borrow().size, 3);
     assert_eq!(member(&rt, "s.rest").borrow().entry_count(), Some(4));
     assert_eq!(member(&rt, "s").borrow().size, 12);

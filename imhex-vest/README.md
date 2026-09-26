@@ -54,7 +54,8 @@ png: Png @ 0x0 [5890] = Png { ... }
     highBit: u8 @ 0x0 [1] = 137 (0x89)
     png: char[3] @ 0x1 [3] = "PNG"
   ...
-$ target/release/hexpat run --json --format pattern.hexpat file.bin     # JSON, with [[format]] applied
+$ target/release/hexpat run --json pattern.hexpat file.bin              # JSON, identical to ImHex's export
+$ target/release/hexpat format -p pattern.hexpat -i file.bin -f json -m # same, plcli-style, with metadata
 $ target/release/hexpat run -I vendor/ImHex-Patterns/includes bmp.hexpat x.bmp   # with the real std library
 $ target/release/hexpat emit-vest formats/elf.hexpat                    # print the Vest DSL
 $ target/release/hexpat parse pattern.hexpat                            # syntax check + summary
@@ -63,6 +64,23 @@ $ target/release/hexpat parse pattern.hexpat                            # syntax
 `hexpat run` accepts `-I dir` for `import` resolution, `--in name=value`
 for `in` variables, `--hidden`, `--max-entries N`, and `HEXPAT_TRACE=1`
 prints every statement and pattern creation.
+
+### JSON export
+
+`hexpat run --json` and `hexpat format -f json` write the pattern tree in
+the same JSON that the reference implementation's `plcli format -f json`
+(ImHex's `FormatterJson`) produces: a nested object keyed by variable name,
+arrays as lists, `char[]` arrays and enums and characters as strings,
+integers/floats/booleans as literals unless a `[[format]]` function is
+attached (then its result as a string), sealed structs as their formatted
+value, pointers as an object holding `*(name)`, and padding or `[[hidden]]`
+patterns omitted. `-m` adds the reference's metadata fields (`__type`,
+`__address`, `__size`, `__color`, `__endian`, `__comment`) to every
+object. `hexpat/tests/json.rs` checks the output against the reference
+project's own expected export byte for byte. Automatic colors follow the
+reference palette in creation order, which can differ from ImHex when
+patterns are created in a different order. The earlier structured dump
+(offsets and sizes on every node) is still available as `--tree-json`.
 
 Without an include directory the interpreter provides native
 implementations of `std::mem`, `std::core`, `std::string`, `std::math`,

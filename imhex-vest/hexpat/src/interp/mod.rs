@@ -12,6 +12,7 @@ mod builtins;
 pub mod dump;
 mod expr;
 mod format;
+pub mod imhex_json;
 mod value;
 
 use std::cell::RefCell;
@@ -24,6 +25,7 @@ use crate::error::{Error, Result};
 use crate::reader::Reader;
 
 pub use dump::{dump_json, dump_text};
+pub use imhex_json::dump_json_imhex;
 pub use value::{format_float, Pattern, PatternKind, PatternRef, Value};
 
 /// Result of executing a statement list.
@@ -258,6 +260,8 @@ pub struct Runtime {
     /// array stops after the current element.
     pending_break: bool,
     pending_continue: bool,
+    /// Index into the default pattern color palette.
+    palette_index: usize,
     /// Print every statement and pattern creation to stderr (HEXPAT_TRACE=1).
     pub trace: bool,
     started: std::time::Instant,
@@ -293,6 +297,7 @@ impl Runtime {
             defines: HashMap::new(),
             pending_break: false,
             pending_continue: false,
+            palette_index: 0,
             trace: std::env::var_os("HEXPAT_TRACE").is_some(),
             started: std::time::Instant::now(),
         };
@@ -689,18 +694,16 @@ impl Runtime {
                     inst.endian = endian;
                 }
                 inst.alias_attrs.extend(attrs.iter().cloned());
-                inst.display = display;
+                let _ = display;
+                inst.display = decl.full_name.clone();
                 Ok(inst)
             }
             TypeKind::Forward => Err(Error::new(format!("type `{}` is only forward-declared", decl.full_name))),
-            _ => Ok(Instance {
-                base: InstanceBase::Decl(decl),
-                endian,
-                reference: false,
-                bindings,
-                alias_attrs: Vec::new(),
-                display,
-            }),
+            _ => {
+                let _ = display;
+                let display = decl.full_name.clone();
+                Ok(Instance { base: InstanceBase::Decl(decl), endian, reference: false, bindings, alias_attrs: Vec::new(), display })
+            }
         }
     }
 
@@ -1360,6 +1363,41 @@ impl Runtime {
         Ok(())
     }
 
+    /// The reference runtime's default pattern color palette (ABGR).
+    const PALETTE: [u32; 9] = [0x70B4771F, 0x700E7FFF, 0x702CA02C, 0x702827D6, 0x70BD6794, 0x704B568C, 0x70C277E3, 0x7022BDBC, 0x70CFBE17];
+
+    /// The next automatic pattern color.
+    fn next_color(&mut self) -> u32 {
+        let c = Self::PALETTE[self.palette_index % Self::PALETTE.len()];
+        self.palette_index += 1;
+        c
+    }
+
+    /// Gives a freshly created pattern its automatic color: composite
+    /// patterns take their first member's color, everything else takes the
+    /// next palette entry.
+    fn assign_color(&mut self, p: &PatternRef) {
+        let first_child = {
+            let pb = p.borrow();
+            if pb.color.is_some() {
+                return;
+            }
+            match &pb.kind {
+                PatternKind::Struct { members } | PatternKind::Union { members } => members.first().cloned(),
+                PatternKind::Bitfield { fields, .. } => fields.first().cloned(),
+                PatternKind::Array { entries } => entries.first().cloned(),
+                PatternKind::StaticArray { template, .. } => Some(template.clone()),
+                _ => None,
+            }
+        };
+        let color = match first_child {
+            Some(c) => c.borrow().color,
+            None => None,
+        };
+        let color = color.unwrap_or_else(|| self.next_color());
+        p.borrow_mut().color = Some(color);
+    }
+
     /// Creates a pattern of type `inst` named `name` at the cursor and
     /// advances the cursor past it.
     pub fn create_pattern(&mut self, inst: &Instance, name: &str, endian: Endian, section: usize) -> Result<PatternRef> {
@@ -1381,6 +1419,7 @@ impl Runtime {
                 }
             }
         };
+        self.assign_color(&p);
         let applied_in_scope = matches!(&inst.base, InstanceBase::Decl(d) if matches!(d.kind, TypeKind::Struct(_) | TypeKind::Union(_) | TypeKind::Bitfield(_)));
         if !inst.alias_attrs.is_empty() && !applied_in_scope {
             let attrs = inst.alias_attrs.clone();
@@ -1759,6 +1798,7 @@ impl Runtime {
             p.hidden = true;
         }
         let p = p.shared();
+        self.assign_color(&p);
         if !field.attrs.iter().any(|a| a.is("no_unique_address")) {
             state.borrow_mut().bits = running + bits;
         }
@@ -1824,13 +1864,12 @@ impl Runtime {
                 PatternKind::StaticArray { template, count }
             };
             let type_name = format!("{}[{}]", inst.display, count);
-            let mut p = Pattern::new(name, &type_name, start, total, section, endian, kind);
-            if trim_nul {
-                p.attributes.push(("$null_terminated$".to_string(), Vec::new()));
-            }
+            let p = Pattern::new(name, &type_name, start, total, section, endian, kind).shared();
+            let _ = trim_nul;
+            self.assign_color(&p);
             self.cursor = start + total;
             let _ = &mut count;
-            return Ok(p.shared());
+            return Ok(p);
         }
 
         // Non-scalar elements: materialise each entry.
@@ -1900,6 +1939,7 @@ impl Runtime {
             pb.size = size_bytes;
             pb.type_name = format!("{}[{}]", inst.display, index);
         }
+        self.assign_color(&pattern);
         Ok(pattern)
     }
 
@@ -1940,9 +1980,10 @@ impl Runtime {
             return Err(Error::new(format!("pointer `{}` resolves to a negative address", name)));
         }
         self.cursor = address as u64;
+        let pointee_name = format!("*({})", name);
         let r = match array {
-            Some(sz) => self.create_array(inst, name, sz, endian, section),
-            None => self.create_pattern(inst, name, endian, section),
+            Some(sz) => self.create_array(inst, &pointee_name, sz, endian, section),
+            None => self.create_pattern(inst, &pointee_name, endian, section),
         };
         self.cursor = after;
         let pointee = r?;
@@ -2079,23 +2120,14 @@ impl Runtime {
                 }
             }
             PatternKind::String => {
+                // Like the reference, the value keeps every byte of the
+                // array, including a terminating NUL of an unsized array.
                 let bytes = reader.bytes(pb.offset, pb.size)?;
-                let bytes = if pb.has_attribute("$null_terminated$") {
-                    let end = bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len());
-                    &bytes[..end]
-                } else {
-                    bytes
-                };
                 Value::Str(crate::lower::bytes_to_string(bytes))
             }
             PatternKind::WideString => {
                 let units = reader.unsigned_array(pb.offset, 2, pb.size / 2, pb.endian)?;
-                let mut units: Vec<u16> = units.into_iter().map(|u| u as u16).collect();
-                if pb.has_attribute("$null_terminated$") {
-                    if let Some(end) = units.iter().position(|u| *u == 0) {
-                        units.truncate(end);
-                    }
-                }
+                let units: Vec<u16> = units.into_iter().map(|u| u as u16).collect();
                 Value::Str(String::from_utf16_lossy(&units))
             }
             PatternKind::BitfieldField { base_offset, bit_offset, bit_size, signed, typed } => {
