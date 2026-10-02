@@ -1,0 +1,6 @@
+,Ens-LSZ 50 mM Tris-HCl,,Ens-LSZ 50 mM phosphate,,Ens-LSZ 50 mM PBS,
+,Mean,SD,Mean,SD,Mean,SD
+Control,34.79,0.46,45.54,0.51,27.77,0.37
+Thermal stress,32.54,0.91,45.11,1.26,27.9,1.81
+Milling + thermal stress,33.16,1.03,45.29,0.39,26.88,1.83
+Storage,35.07,1.17,45.04,1.41,27.53,0.65

@@ -1,0 +1,6 @@
+,Ens-LSZ 50 mM Tris-HCl pH 7.2,,Ens-LSZ 50 mM phosphate pH7.2,,Ens-LSZ 50 mM PBS pH 7.4,
+,Mean,SD,Mean,SD,Mean,SD
+Control,79.55,0.564768,78.62,0.392472,76.57,2.515358
+Thermal stress,74.43,2.877831,77.87,1.121026,76.79,1.386775
+Milling + thermal stress,75.82,2.102115,78.19,0.558647,73.98,1.579476
+Storage,80.18,2.232845,77.77,2.525553,75.89,2.479172
