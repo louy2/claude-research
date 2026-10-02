@@ -130,6 +130,28 @@ KB's recovered photo database would be a good test case. `dbtw.py verify`
 reports any index entry it cannot reconcile with the records, which makes it a
 quick way to find where these notes are wrong.
 
+### Leads for real textbases (checked October 2026)
+
+* **Vendor demo, c. 2000.** The Wayback Machine has captures of
+  `www.inmagic.com/download.htm` (1999) and `www.inmagic.com/downloads.htm`
+  (2000–2003). These pages offered a free DB/TextWorks demo limited to 50
+  records, and the software installs vendor-made sample textbases called
+  `Sample1` and `Sample2`. This is the cleanest lead because the samples
+  contain no third-party data. It has not been fetched yet, because
+  `web.archive.org` was not reachable from the environment used here.
+* **CATIE, `librarypdf.catie.ca/Textbase/CHIC/`.** This was a public copy of a
+  DB/TextWorks 7.0 installation folder that included `readme.htm` and
+  `drwtsn32.log`. It now returns 403, but the Wayback Machine has a capture of
+  the directory from 2019-08-18. Check its contents before using it, because a
+  library textbase folder can contain patron or loan records as well as
+  bibliographic data.
+* Dead ends: the public Genie and MARC service packs on `support.inmagic.com`
+  contain only program files. archive.org item search finds manuals and
+  tutorials but no textbases. The Helen Keller Archive item (`hk-2009`) is an
+  XML export, not raw textbase files.
+  [`TextBase`](https://pypi.org/project/TextBase/) on PyPI reads the Inmagic
+  tagged *export* format, not the binary files.
+
 ## Usage
 
 ```
