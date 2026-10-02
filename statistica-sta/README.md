@@ -120,9 +120,13 @@ starting at 100, and the label table maps each code back to its text.
 
 ## What is still unknown
 
-* **The newer layout.** Of 29 `.sta` files from Zenodo, only one uses `CSS `.
-  The rest start with `80 06 00 01` or `80 06 00 00` and come from datasets
-  published 2013–2026. That layout is different and is not handled here; it
+* **The newer layout.** I downloaded 27 of the 30 `.sta` files found on
+  Zenodo. Three were not Statistica files (an Abaqus job status file and two
+  zero-filled 240-byte files), and only one used `CSS `. The other 23 start
+  with `80 06 00 01` or `80 06 00 00` and come from datasets published
+  2013–2026. (The other three were a 4.4 GB file, which I skipped, and two
+  that failed to download.) That layout is different and is not handled
+  here; it
   is the larger open problem, because researchers still deposit it.
 * Case names, the 80-byte title, the meaning of the `0x04` signature and of
   the fourth u32 length, and formulas other than the one sample.
