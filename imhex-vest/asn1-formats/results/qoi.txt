@@ -1,5 +1,0 @@
-format: qoi
-stainless exit status: 143
-wall time: 952 s
-
-VCs that are not valid:

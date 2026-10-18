@@ -1,0 +1,6 @@
+format: wav (safety)
+stainless exit status: 0
+wall time: 582 s
+total: 747  valid: 747  (170 from cache, 63 trivial) invalid: 0    unknown: 0    time:  532.59
+
+VCs that are not valid:

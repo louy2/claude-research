@@ -22,11 +22,20 @@ A Rust toolchain for the [ImHex pattern language](https://docs.werwolv.net/patte
    from the CC0 patterns in [`formats/`](formats/), with tests showing that
    the verified parser and the interpreter agree on every checked field and
    that the verified serializer reproduces the input bytes.
+5. **`hexpat emit-asn1`** – a translator from the same subset to **ASN.1 +
+   ACN** for [ASN1SCC](https://github.com/maxime-esa/asn1scc), whose Scala
+   backend emits codecs annotated for the Stainless verifier
+   ([arXiv:2412.07235](https://arxiv.org/abs/2412.07235)).
+   [`asn1-formats/`](asn1-formats/) holds the specs for the ten formats, a
+   patch for six ASN1SCC Scala-backend bugs they exposed, a differential test
+   of the generated decoders against the interpreter, and the Stainless
+   results.
 
 ```
 formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib primitives)──▶ pattern tree
                                    │
-                                   └──emit-vest──▶ *.vest ──vest compiler──▶ verified Rust (vest_lib)
+                                   ├──emit-vest──▶ *.vest ──vest compiler──▶ verified Rust (vest_lib)
+                                   └──emit-asn1──▶ *.asn + *.acn ──ASN1SCC──▶ Scala for Stainless
 ```
 
 ## Layout
@@ -39,10 +48,12 @@ formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib prim
 | `hexpat/src/reader.rs` | every integer/byte read goes through a `vest_lib` combinator |
 | `hexpat/src/interp/` | evaluator: types, scopes, structs, unions, arrays, bitfields, pointers, sections, functions, builtins, format strings, dumps |
 | `hexpat/src/emit.rs` | hexpat → Vest DSL |
+| `hexpat/src/emit_asn1.rs` | hexpat → ASN.1 + ACN (and the Scala test harness) |
+| `asn1-formats/` | ASN.1/ACN specs of `formats/`, ASN1SCC patch, verification results |
 | `hexpat/src/bin/hexpat.rs` | CLI: `parse`, `run`, `emit-vest` |
 | `formats/` | CC0 patterns for popular formats (declarative subset) |
 | `vest-formats/` | generated `.vest` + generated verified Rust + end-to-end tests |
-| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh` |
+| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
 
 ## Usage
 
@@ -58,6 +69,7 @@ $ target/release/hexpat run --json pattern.hexpat file.bin              # JSON, 
 $ target/release/hexpat format -p pattern.hexpat -i file.bin -f json -m # same, plcli-style, with metadata
 $ target/release/hexpat run -I vendor/ImHex-Patterns/includes bmp.hexpat x.bmp   # with the real std library
 $ target/release/hexpat emit-vest formats/elf.hexpat                    # print the Vest DSL
+$ target/release/hexpat emit-asn1 formats/elf.hexpat -o out/            # ASN.1 + ACN for ASN1SCC
 $ target/release/hexpat parse pattern.hexpat                            # syntax check + summary
 ```
 
@@ -156,12 +168,28 @@ unsigned width with a note, because the Vest DSL does not expose them yet.
 Rust builds with plain cargo; `cargo verus verify` checks the proofs when
 Verus is installed.
 
+## hexpat → ASN.1/ACN
+
+`hexpat emit-asn1` covers the same declarative subset as `emit-vest` and
+adds a few things the Vest DSL lacks: per-field byte order, conditional
+members (`present-when` expressions on OPTIONAL components, so `else`
+branches and `match` defaults translate), and arbitrary bit widths. ACN's
+own rules change the shape of the output: length fields become
+ACN-inserted fields recomputed by the encoder, conditions may only test
+plain fields of the same SEQUENCE (so referenced children are inlined),
+every size needs an upper bound, and enums stay open INTEGERs. The details,
+the ASN1SCC fixes and the results are in [`asn1-formats/README.md`](asn1-formats/README.md).
+
 ## Tests
 
 ```console
 $ cargo test                       # grammar, preprocessor, lowering, interpreter, emitter, end-to-end formats
 $ cd tree-sitter-hexpat && tree-sitter test
 ```
+
+`hexpat/tests/asn1.rs` checks the committed ASN.1/ACN specs against the
+emitter and, once `scripts/regen-asn1.sh` has built the ASN1SCC decoders,
+compares them field by field with the interpreter.
 
 `vest-formats/tests/formats.rs` builds a synthetic file for each format,
 parses it with the verified parser, evaluates the same bytes with the

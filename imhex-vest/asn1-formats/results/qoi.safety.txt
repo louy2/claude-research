@@ -1,0 +1,6 @@
+format: qoi (safety)
+stainless exit status: 0
+wall time: 148 s
+total: 298  valid: 298  (81 from cache, 34 trivial) invalid: 0    unknown: 0    time:  117.25
+
+VCs that are not valid:

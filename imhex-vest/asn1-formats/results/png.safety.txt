@@ -1,0 +1,6 @@
+format: png (safety)
+stainless exit status: 0
+wall time: 1276 s
+total: 1521 valid: 1521 (690 from cache, 135 trivial) invalid: 0    unknown: 0    time: 1179.57
+
+VCs that are not valid:

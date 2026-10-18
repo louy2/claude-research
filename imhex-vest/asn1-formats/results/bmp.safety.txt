@@ -1,0 +1,6 @@
+format: bmp (safety)
+stainless exit status: 0
+wall time: 1933 s
+total: 988  valid: 988  (219 from cache, 64 trivial) invalid: 0    unknown: 0    time: 1839.95
+
+VCs that are not valid:

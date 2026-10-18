@@ -1,0 +1,9 @@
+format: zip (safety)
+stainless exit status: 1
+wall time: 3667 s
+total: 848  valid: 845  (379 from cache, 65 trivial) invalid: 0    unknown: 3    time: 3405.32
+
+VCs that are not valid:
+src/main/scala/asn1src/zip.scala:377:9: LocalFileHeader_ACN_Encode body assertion: Inlined precondition of check timeout Pfolio 120.4
+src/main/scala/asn1src/zip.scala:405:9: LocalFileHeader_ACN_Encode body assertion: Inlined precondition of check timeout Pfolio 120.3
+src/main/scala/asn1src/zip.scala:419:101: LocalFileHeader_ACN_Encode body assertion: Addition overflow timeout Pfolio 120.2

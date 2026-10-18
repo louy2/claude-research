@@ -1,0 +1,6 @@
+format: gif (safety)
+stainless exit status: 0
+wall time: 463 s
+total: 796  valid: 796  (171 from cache, 65 trivial) invalid: 0    unknown: 0    time:  423.18
+
+VCs that are not valid:

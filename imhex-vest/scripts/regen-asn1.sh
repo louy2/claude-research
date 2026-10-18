@@ -2,7 +2,9 @@
 # Regenerates asn1-formats/asn1/<name>/ (ASN.1, ACN, type map, Scala harness)
 # from formats/*.hexpat, then, when the tools are available, runs ASN1SCC's
 # Scala backend into asn1-formats/build/<name>/ and compiles the result with
-# the harness.
+# the harness. The code generated with -invertibility is what the harness
+# runs and what scripts/verify-asn1.sh MODE=invertibility checks; a copy
+# generated without it goes to build/<name>/scala-safety.
 #
 #   ASN1SCC   asn1scc executable (patched, see asn1-formats/README.md)
 #   SCALAC    Scala 3 compiler (default: scalac3)
@@ -29,6 +31,9 @@ for name in "${names[@]}"; do
   rm -rf "$build"
   mkdir -p "$build/classes"
   "$ASN1SCC" -Scala -ACN -invertibility -o "$build/scala" "$spec/$name.asn" "$spec/$name.acn"
+  # Without -invertibility: what scripts/verify-asn1.sh checks in its
+  # default (safety) mode.
+  "$ASN1SCC" -Scala -ACN -o "$build/scala-safety" "$spec/$name.asn" "$spec/$name.acn"
   cp "$spec/HexpatHarness.scala" "$build/harness.scala"
   lib="$build/scala/lib/stainless-library_3-0.9.8.7.jar"
   "$SCALAC" -classpath "$lib" -d "$build/classes" $(find "$build/scala/src" -name '*.scala') "$build/harness.scala"

@@ -1,0 +1,6 @@
+format: tar (safety)
+stainless exit status: 0
+wall time: 3631 s
+total: 912  valid: 912  (151 from cache, 20 trivial) invalid: 0    unknown: 0    time: 3482.49
+
+VCs that are not valid:

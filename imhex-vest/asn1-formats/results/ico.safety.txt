@@ -1,0 +1,6 @@
+format: ico (safety)
+stainless exit status: 0
+wall time: 1000 s
+total: 1330 valid: 1330 (344 from cache, 71 trivial) invalid: 0    unknown: 0    time:  920.36
+
+VCs that are not valid:
