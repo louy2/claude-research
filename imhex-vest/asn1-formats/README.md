@@ -62,7 +62,9 @@ ACN's rules shape the rest of the translation:
   addressable. Bounds are the length field's range capped at `--max-len`
   (default 1 MiB).
 - **Open enums.** hexpat enums accept unnamed values, so they become INTEGER
-  types; an ENUMERATED would reject them.
+  types; an ENUMERATED would reject them. `--inline-enums` emits them as
+  INTEGER components instead of named types, which the invertibility
+  proofs need (see Results).
 - **No "until the end of the input".** ACN's `size deduced` is not
   available in the Scala backend, so a trailing `T x[while(!std::mem::eof())]`
   of the root struct is left out of the root SEQUENCE and the harness decodes
@@ -127,10 +129,9 @@ decoders and with the hexpat interpreter:
 
 ### Stainless
 
-`scripts/verify-asn1.sh` runs Stainless 0.9.8.9 with ASN1SCC's own
-`stainless.conf` (solvers cvc5, z3 and cvc4 as a portfolio, 120 s per VC)
-on every function ASN1SCC generated for a format; calls into the
-`asn1scala` runtime are checked against the runtime's contracts.
+`scripts/verify-asn1.sh` runs Stainless 0.9.8.9 on every function ASN1SCC
+generated for a format; calls into the `asn1scala` runtime are checked
+against the runtime's contracts.
 
 **Safety mode** (code generated without `-stainlessInvertibility`):
 absence of runtime errors (array bounds, integer overflow, preconditions of
@@ -138,33 +139,58 @@ every runtime call, match exhaustiveness), termination, and the exact number
 of bits each encoder writes and each decoder reads, as stated by the
 functions' postconditions.
 
-| Format | VCs | Valid | Unknown (timeout) | Invalid | Wall time |
-|---|---:|---:|---:|---:|---:|
-| bmp | 988 | 988 | 0 | 0 | 32 min |
-| elf | 4111 | decoders 1706 / 1706; encoders in progress | – | 0 | – |
-| gif | 796 | 796 | 0 | 0 | 7 min |
-| gzip | 720 | 719 | 1 | 0 | 14 min |
-| ico | 1330 | 1330 | 0 | 0 | 16 min |
-| png | 1521 | 1521 | 0 | 0 | 21 min |
-| qoi | 298 | 298 | 0 | 0 | 2 min |
-| tar | 912 | 912 | 0 | 0 | 60 min |
-| wav | 747 | 747 | 0 | 0 | 9 min |
-| zip | 848 | 845 | 3 | 0 | 61 min |
+| Format | VCs | Valid | Invalid | Unknown | Needed the 600 s timeout |
+|---|---:|---:|---:|---:|---|
+| bmp | 988 | 988 | 0 | 0 | |
+| elf | 4099 | 4099 | 0 | 0 | 35 VCs of the header encoders |
+| gif | 796 | 796 | 0 | 0 | |
+| gzip | 720 | 720 | 0 | 0 | 1 VC (bitfield encoder) |
+| ico | 1330 | 1330 | 0 | 0 | |
+| png | 1521 | 1521 | 0 | 0 | |
+| qoi | 298 | 298 | 0 | 0 | |
+| tar | 912 | 912 | 0 | 0 | |
+| wav | 747 | 747 | 0 | 0 | |
+| zip | 848 | 848 | 0 | 0 | 3 VCs of `LocalFileHeader_ACN_Encode` |
+| **total** | **12259** | **12259** | **0** | **0** | |
 
-"Unknown" means no solver answered within 120 s; none of the VCs was
-found invalid. The VCs reported as unknown are listed in
-`results/<name>.safety.txt`. "From cache" VCs in those files were proven
-in earlier runs of the same Stainless version on the same code, so the
-wall times are those of the final runs, not of a run from scratch. ELF's
-4111 VCs are split into its decoders (1706) and everything else (2405).
+All 12,259 VCs are valid. Most runs used ASN1SCC's own `stainless.conf`
+(cvc5, z3 and cvc4 as a portfolio, 120 s per VC). 39 VCs timed out at
+120 s; they are the ghost checks of encoders with long field lists, whose
+context grows with every field (the last fields of ELF's 13-field headers,
+ZIP's three variable-size strings). They were re-run with a 600 s timeout
+and were all proven. The 600 s runs (ELF's encoders, gzip, and ZIP's
+`LocalFileHeader_ACN_Encode`) used `stainless-2solvers.conf` (cvc5 and z3
+only) with two VCs in parallel (`java -Dparallel=2`), to stay within the
+4 cores and 13.7 GB of the container. Per-run summaries are in `results/`:
+`<name>.safety.txt`, ELF split into `elf.safety.decoders.txt` and
+`elf.safety.encoders.txt`, and the ZIP re-run in `zip.safety.retry.txt`.
+"From cache" VCs in those files were proven by an earlier run of the same
+Stainless version on the same generated code.
 
-**Invertibility mode** (code generated with `-stainlessInvertibility`, which
-adds `decode(encode(v)) == v` for SEQUENCE types and the prefix lemmas it
-relies on) was attempted on QOI: 537 of its 1005 VCs had been checked when
-the run was stopped, the remaining ones taking up to the 120 s timeout each.
-Completing it, and the larger formats, needs far more solver time than the
-4-core, 13.7 GB container this was run in.
+**Invertibility mode** (code generated with `-stainlessInvertibility`)
+adds, for every encoder, the postcondition that decoding what it wrote
+gives back the encoded value, `decode(encode(v)) == v`, together with the
+prefix lemmas the proof uses. It was run on QOI with
+`stainless-2solvers.conf` and a 600 s timeout:
 
+| QOI spec | VCs | Valid | Invalid | Unknown |
+|---|---:|---:|---:|---:|
+| committed (`asn1/qoi/`, enums as named INTEGER types) | 1002 | 998 | 3 | 1 |
+| `emit-asn1 --inline-enums` (enums as INTEGER components) | 816 | 816 | 0 | 0 |
+
+With the committed spec, all VCs of the `Qoi` SEQUENCE are valid, but the
+encoder postcondition and the prefix lemma of the two enum types
+(`Channels-T ::= INTEGER (0..255)`, `Colorspace-T`) are not: Stainless
+returns counterexamples in which the opaque decoder's result is left
+unconstrained, i.e. ASN1SCC's contracts for a standalone INTEGER type
+assignment are too weak to prove its invertibility lemmas. The same fields
+as INTEGER components of the SEQUENCE are proven, so `--inline-enums`
+gives a QOI codec whose round trip is fully proven (the Scala code ASN1SCC
+generates from the emitter's `--inline-enums` output is identical to the
+code that was verified). The committed specs keep named enum types, which
+the safety results above refer to. Invertibility for the larger formats
+was not attempted; at QOI's cost (about 50 minutes for 816 VCs) it needs
+more solver time than this run had.
 
 ## Reproducing
 
@@ -175,6 +201,12 @@ $ scripts/regen-asn1.sh                  # specs, generated Scala, compiled harn
 $ cargo test -p hexpat --test asn1       # differential test (skipped without build/)
 $ scripts/verify-asn1.sh                 # Stainless, summaries in results/
 ```
+
+`verify-asn1.sh` takes `MODE=safety|invertibility`, `TIMEOUT` (seconds per
+VC), `STAINLESS_CONF` (for example `stainless-2solvers.conf`) and
+`INCLUDE`/`EXCLUDE` regexes with a `PART` label to split a format into
+several runs. Stainless checks one VC at a time unless the JVM is started
+with `-Dparallel=N`; a launcher script passed as `STAINLESS` can add it.
 
 The specs alone need only the hexpat binary:
 `hexpat emit-asn1 formats/png.hexpat -o out/` writes `png.asn`, `png.acn`,

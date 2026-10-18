@@ -28,8 +28,10 @@ A Rust toolchain for the [ImHex pattern language](https://docs.werwolv.net/patte
    ([arXiv:2412.07235](https://arxiv.org/abs/2412.07235)).
    [`asn1-formats/`](asn1-formats/) holds the specs for the ten formats, a
    patch for six ASN1SCC Scala-backend bugs they exposed, a differential test
-   of the generated decoders against the interpreter, and the Stainless
-   results.
+   of the generated decoders against the interpreter (22 files, every field
+   agrees), and the Stainless results: all 12,259 safety VCs of the ten
+   formats are valid, and QOI's `decode(encode(v)) == v` is fully proven
+   with `--inline-enums`.
 
 ```
 formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib primitives)──▶ pattern tree

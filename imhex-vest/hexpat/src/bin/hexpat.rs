@@ -5,7 +5,7 @@
 //! hexpat run <pattern.hexpat> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N]
 //! hexpat format -p <pattern.hexpat> -i <data> [-I dir]... [-f json] [-m] [-o out.json]
 //! hexpat emit-vest <pattern.hexpat> [-I dir]... [-o out.vest]
-//! hexpat emit-asn1 <pattern.hexpat> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--root TYPE]
+//! hexpat emit-asn1 <pattern.hexpat> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--inline-enums] [--root TYPE]
 //!
 //! `--json` and `format -f json` produce the same JSON as the reference
 //! implementation's `plcli format -f json`; `-m` adds its metadata fields.
@@ -18,7 +18,7 @@ use hexpat::interp::dump::DumpOptions;
 use hexpat::{Runtime, Value};
 
 fn usage() -> ExitCode {
-    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--root TYPE]");
+    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--inline-enums] [--root TYPE]");
     ExitCode::from(2)
 }
 
@@ -41,6 +41,7 @@ struct Args {
     module: Option<String>,
     max_len: Option<u64>,
     twos_complement: bool,
+    inline_enums: bool,
 }
 
 fn parse_args() -> Option<Args> {
@@ -63,6 +64,7 @@ fn parse_args() -> Option<Args> {
         module: None,
         max_len: None,
         twos_complement: false,
+        inline_enums: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -83,6 +85,7 @@ fn parse_args() -> Option<Args> {
             "--module" => a.module = Some(it.next()?),
             "--max-len" => a.max_len = Some(it.next()?.parse().ok()?),
             "--twos-complement" => a.twos_complement = true,
+            "--inline-enums" => a.inline_enums = true,
             "--in" => {
                 let kv = it.next()?;
                 let (k, v) = kv.split_once('=')?;
@@ -342,7 +345,7 @@ fn cmd_emit_asn1(args: &Args) -> ExitCode {
         }
     };
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("hexpat").to_string();
-    let mut opts = hexpat::emit_asn1::Asn1Options { module: args.module.clone().unwrap_or(stem.clone()), root: args.root.clone(), twos_complement: args.twos_complement, ..Default::default() };
+    let mut opts = hexpat::emit_asn1::Asn1Options { module: args.module.clone().unwrap_or(stem.clone()), root: args.root.clone(), twos_complement: args.twos_complement, inline_enums: args.inline_enums, ..Default::default() };
     if let Some(m) = args.max_len {
         opts.max_len = m;
     }

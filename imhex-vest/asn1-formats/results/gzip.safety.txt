@@ -1,7 +1,6 @@
 format: gzip (safety)
-stainless exit status: 1
-wall time: 863 s
-total: 720  valid: 719  (153 from cache, 38 trivial) invalid: 0    unknown: 1    time:  813.28
+stainless exit status: 0
+wall time: 706 s
+total: 720  valid: 720  (150 from cache, 38 trivial) invalid: 0    unknown: 0    time: 1281.72
 
 VCs that are not valid:
-src/main/scala/asn1src/gzip.scala:226:13: Flags_T_ACN_Encode body assertion: Inlined precondition of bitCountLemma timeout Pfolio 120.3

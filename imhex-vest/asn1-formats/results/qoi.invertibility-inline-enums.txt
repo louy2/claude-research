@@ -1,0 +1,5 @@
+format: qoi (invertibility), spec emitted with --inline-enums
+stainless: stainless-2solvers.conf, 600 s per VC
+total: 816  valid: 816  (225 from cache, 21 trivial) invalid: 0    unknown: 0    time: 2888.60
+
+VCs that are not valid:

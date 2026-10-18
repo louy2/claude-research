@@ -71,11 +71,16 @@ pub struct Asn1Options {
     /// complement, so wider signed fields are read as unsigned integers of
     /// the same width.
     pub twos_complement: bool,
+    /// Emit enums as INTEGER components of the SEQUENCEs that use them
+    /// instead of named INTEGER types. ASN1SCC's invertibility lemmas for a
+    /// standalone INTEGER type assignment do not follow from the generated
+    /// contracts; inside a SEQUENCE they do.
+    pub inline_enums: bool,
 }
 
 impl Default for Asn1Options {
     fn default() -> Self {
-        Asn1Options { module: "Hexpat".into(), root: None, max_len: 1 << 20, twos_complement: false }
+        Asn1Options { module: "Hexpat".into(), root: None, max_len: 1 << 20, twos_complement: false, inline_enums: false }
     }
 }
 
@@ -260,6 +265,7 @@ struct Emitter {
     endian: Endian,
     max_len: u64,
     twos_complement: bool,
+    inline_enums: bool,
     decls: BTreeMap<String, Decl>,
     order: Vec<String>,
     root_candidates: Vec<String>,
@@ -314,6 +320,7 @@ pub fn emit_asn1(program: &Program, endian: Endian, opts: &Asn1Options) -> Resul
         endian,
         max_len: opts.max_len.max(1),
         twos_complement: opts.twos_complement,
+        inline_enums: opts.inline_enums,
         decls: BTreeMap::new(),
         order: Vec::new(),
         root_candidates: Vec::new(),
@@ -341,6 +348,9 @@ pub fn emit_asn1(program: &Program, endian: Endian, opts: &Asn1Options) -> Resul
         }
     }
     for name in em.order.clone() {
+        if em.inline_enums && matches!(em.decls.get(&name), Some(Decl::Enum(_))) {
+            continue;
+        }
         em.emit_decl(&name);
     }
     em.assign_names();
@@ -521,6 +531,13 @@ impl Emitter {
                 let Some((full, decl)) = self.lookup(name) else {
                     return Err(Error::new(format!("unknown type `{}`", joined)));
                 };
+                if let (true, Decl::Enum(d)) = (self.inline_enums, &decl) {
+                    let mut base = d.ty.clone();
+                    if t.endian.is_some() {
+                        base.endian = t.endian;
+                    }
+                    return self.ty_of(&base);
+                }
                 if let Decl::Alias(inner) = &decl {
                     // Aliases of builtins are inlined (with the use site's endianness).
                     if let TypeBase::Builtin(_) = inner.base {
@@ -1787,7 +1804,7 @@ mod tests {
 
     fn emit(src: &str, endian: Endian) -> Asn1Output {
         let program = crate::parse_program(src).unwrap();
-        emit_asn1(&program, endian, &Asn1Options { module: "test".into(), root: None, max_len: 1000, twos_complement: true }).unwrap()
+        emit_asn1(&program, endian, &Asn1Options { module: "test".into(), root: None, max_len: 1000, twos_complement: true, inline_enums: false }).unwrap()
     }
 
     #[test]
@@ -1885,6 +1902,15 @@ mod tests {
         let out = emit("struct Header { u8 a; }; struct Gif { Header header; }; Gif g @ 0;", Endian::Little);
         assert!(out.asn.contains("Header-T ::= SEQUENCE"), "{}", out.asn);
         assert!(out.asn.contains("header Header-T"), "{}", out.asn);
+    }
+
+    #[test]
+    fn enums_can_be_inlined() {
+        let program = crate::parse_program("enum E : u16 { A = 1 }; struct S { E e; }; S s @ 0;").unwrap();
+        let opts = Asn1Options { module: "t".into(), inline_enums: true, ..Default::default() };
+        let out = emit_asn1(&program, Endian::Big, &opts).unwrap();
+        assert!(out.asn.contains("S ::= SEQUENCE {\n    e INTEGER (0..65535)\n}"), "{}", out.asn);
+        assert!(!out.asn.contains("E ::="), "{}", out.asn);
     }
 
     #[test]

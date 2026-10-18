@@ -1,0 +1,6 @@
+format: zip (safety, retry: functions matching LocalFileHeader_ACN_Encode)
+stainless exit status: 0
+wall time: 742 s
+total: 358  valid: 358  (329 from cache, 3 trivial) invalid: 0    unknown: 0    time: 1098.37
+
+VCs that are not valid:
