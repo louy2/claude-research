@@ -35,7 +35,13 @@ fi
   cd "$TOOLS/stainless"
   git checkout -q "$STAINLESS_TAG"
   git submodule update --init inox
-  sbt stainless-dotty-standalone/assembly
+  # Maven Central answers bursts of downloads with HTTP 429; downloaded
+  # artifacts stay cached, so retrying makes progress.
+  for attempt in $(seq 1 20); do
+    sbt stainless-dotty-standalone/assembly < /dev/null && break
+    [ "$attempt" = 20 ] && exit 1
+    sleep 10
+  done
 )
 jar=$(ls "$TOOLS"/stainless/frontends/stainless-dotty-standalone/target/scala-*/stainless-dotty-standalone-0.9.8.9.jar)
 cat > "$TOOLS/stainless.sh" <<EOF

@@ -19,6 +19,9 @@
 #   STAINLESS_CONF   stainless.conf (default: asn1-formats/stainless.conf)
 #   TIMEOUT          per-VC timeout in seconds (default: 120)
 #   MODE             safety (default) or invertibility
+#   INCLUDE/EXCLUDE  extended regexes selecting the generated functions to
+#                    verify (for splitting a large format over several runs)
+#   PART             label added to the result file name of such a run
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAINLESS="${STAINLESS:-stainless}"
@@ -38,22 +41,24 @@ for name in "${names[@]}"; do
   build="$ROOT/asn1-formats/build/$name"
   [ -d "$build/$sub" ] || { echo "$name: not built (run scripts/regen-asn1.sh)"; continue; }
   cd "$build/$sub"
-  fns=$(grep -ohE "^ *(@[a-zA-Z]+ )*def [A-Za-z0-9_]+" src/main/scala/asn1src/*.scala | grep -oE "def [A-Za-z0-9_]+" | sed 's/def //' | sort -u | paste -sd, -)
+  fns=$(grep -ohE "^ *(@[a-zA-Z]+ )*def [A-Za-z0-9_]+" src/main/scala/asn1src/*.scala | grep -oE "def [A-Za-z0-9_]+" | sed 's/def //' | sort -u \
+    | grep -E "${INCLUDE:-.}" | { if [ -n "${EXCLUDE:-}" ]; then grep -vE "$EXCLUDE"; else cat; fi; } | paste -sd, -)
+  tag="$MODE${PART:+.$PART}"
   srcs=$(ls src/main/scala/asn1scala/asn1jvm*.scala src/main/scala/asn1src/*.scala | grep -v "Codec_PER\|Codec_UPER")
   start=$(date +%s)
   "$STAINLESS" $srcs --config-file="$CONF" --timeout="${TIMEOUT:-120}" \
-    --functions="$fns" --json="$build/stainless-$MODE.json" > "$build/stainless-$MODE.log" 2>&1
+    --functions="$fns" --json="$build/stainless-$tag.json" > "$build/stainless-$tag.log" 2>&1
   status=$?
   end=$(date +%s)
-  sed 's/\x1b\[[0-9;]*m//g' "$build/stainless-$MODE.log" | tr '\r' '\n' > "$build/stainless-$MODE.txt"
+  sed 's/\x1b\[[0-9;]*m//g' "$build/stainless-$tag.log" | tr '\r' '\n' > "$build/stainless-$tag.txt"
   {
-    echo "format: $name ($MODE)"
+    echo "format: $name ($MODE${PART:+, $PART: ${INCLUDE:+functions matching $INCLUDE}${EXCLUDE:+functions not matching $EXCLUDE}})"
     echo "stainless exit status: $status"
     echo "wall time: $((end - start)) s"
-    grep -a -E "total: [0-9]+" "$build/stainless-$MODE.txt" | tail -1 | sed 's/^.*\(total:\)/\1/; s/ *[^0-9a-z:. ()]*$//; s/ *$//'
+    grep -a -E "total: [0-9]+" "$build/stainless-$tag.txt" | tail -1 | sed 's/^.*\(total:\)/\1/; s/ *[^0-9a-z:. ()]*$//; s/ *$//'
     echo
     echo "VCs that are not valid:"
-    grep -a -E " (invalid|unknown|timeout) " "$build/stainless-$MODE.txt" | grep -a -v "total:" | sed 's/^\[[^]]*\] *[^ ]* *//; s/ *[^ ]* *$//; s/  */ /g' | head -100
-  } > "$ROOT/asn1-formats/results/$name.$MODE.txt"
-  head -4 "$ROOT/asn1-formats/results/$name.$MODE.txt"
+    grep -a -E " (invalid|unknown|timeout) " "$build/stainless-$tag.txt" | grep -a -v "total:" | sed 's/^\[[^]]*\] *[^ ]* *//; s/ *[^ ]* *$//; s/  */ /g' | head -100
+  } > "$ROOT/asn1-formats/results/$name.$tag.txt"
+  head -4 "$ROOT/asn1-formats/results/$name.$tag.txt"
 done
