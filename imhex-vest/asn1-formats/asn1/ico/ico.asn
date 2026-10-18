@@ -1,0 +1,30 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Ico-Module DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+-- enum: Icon = 1, Cursor = 2
+ImageType ::= INTEGER (0..65535)
+
+Header ::= SEQUENCE {
+    reserved INTEGER (0..65535),
+    type-field ImageType,
+    count INTEGER (0..65535)
+}
+
+DirEntry ::= SEQUENCE {
+    width INTEGER (0..255),
+    height INTEGER (0..255),
+    colorCount INTEGER (0..255),
+    reserved INTEGER (0..255),
+    planes INTEGER (0..65535),
+    bitCount INTEGER (0..65535),
+    size INTEGER (0..4294967295),
+    offset INTEGER (0..4294967295)
+}
+
+Ico ::= SEQUENCE {
+    header-reserved INTEGER (0..65535),
+    header-type ImageType,
+    entries SEQUENCE (SIZE(0..65535)) OF DirEntry
+}
+
+END

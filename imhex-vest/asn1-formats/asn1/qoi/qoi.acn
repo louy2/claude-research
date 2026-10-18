@@ -1,0 +1,16 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Qoi-Module DEFINITIONS ::= BEGIN
+
+Channels-T [encoding pos-int, size 8]
+
+Colorspace-T [encoding pos-int, size 8]
+
+Qoi [] {
+    magic [encoding pos-int, size 32],
+    width [encoding pos-int, size 32],
+    height [encoding pos-int, size 32],
+    channels [],
+    colorspace []
+}
+
+END

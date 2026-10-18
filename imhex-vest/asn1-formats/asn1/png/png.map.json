@@ -1,0 +1,37 @@
+{
+  "module": "Png-Module",
+  "root": "Png-T",
+  "trailing": {"field": "chunks", "element": "Chunk"},
+  "max_len": 1048576,
+  "notes": ["`Chunk`: sizes taken from `length` are capped at 1048576 (ASN1SCC needs an upper bound)"],
+  "lossy": ["Chunk.length: derived from data on encoding and written as 0 when it is absent"],
+  "types": [
+    {"name": "Signature-T", "hexpat": "Signature", "components": [
+      {"name": "highBit", "path": "highBit", "role": "field", "shape": "int", "optional": false},
+      {"name": "png", "path": "png", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "dosLineEnding", "path": "dosLineEnding", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "dosEof", "path": "dosEof", "role": "field", "shape": "int", "optional": false},
+      {"name": "unixLineEnding", "path": "unixLineEnding", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "ColorType-T", "hexpat": "ColorType", "alias": "int"},
+    {"name": "Ihdr-T", "hexpat": "Ihdr", "components": [
+      {"name": "width", "path": "width", "role": "field", "shape": "int", "optional": false},
+      {"name": "height", "path": "height", "role": "field", "shape": "int", "optional": false},
+      {"name": "bitDepth", "path": "bitDepth", "role": "field", "shape": "int", "optional": false},
+      {"name": "colorType", "path": "colorType", "role": "field", "shape": {"ref": "ColorType-T"}, "optional": false},
+      {"name": "compressionMethod", "path": "compressionMethod", "role": "field", "shape": "int", "optional": false},
+      {"name": "filterMethod", "path": "filterMethod", "role": "field", "shape": "int", "optional": false},
+      {"name": "interlaceMethod", "path": "interlaceMethod", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Chunk", "hexpat": "Chunk", "components": [
+      {"name": "length", "path": "length", "role": "inserted", "shape": "int", "optional": false},
+      {"name": "type-field", "path": "type", "role": "field", "shape": {"chars_int": 4}, "optional": false},
+      {"name": "ihdr", "path": "ihdr", "role": "field", "shape": {"ref": "Ihdr-T"}, "optional": true},
+      {"name": "data", "path": "data", "role": "field", "shape": "bytes", "optional": true},
+      {"name": "crc", "path": "crc", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Png-T", "hexpat": "Png", "components": [
+      {"name": "signature", "path": "signature", "role": "field", "shape": {"ref": "Signature-T"}, "optional": false}
+    ]}
+  ]
+}

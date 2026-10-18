@@ -1,0 +1,29 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Gif-Module DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+Header-T ::= SEQUENCE {
+    signature OCTET STRING (SIZE(3)),
+    version OCTET STRING (SIZE(3))
+}
+
+ScreenFlags ::= SEQUENCE {
+    globalColorTable INTEGER (0..1),
+    colorResolution INTEGER (0..7),
+    sortFlag INTEGER (0..1),
+    globalColorTableSize INTEGER (0..7)
+}
+
+LogicalScreenDescriptor ::= SEQUENCE {
+    width INTEGER (0..65535),
+    height INTEGER (0..65535),
+    flags ScreenFlags,
+    backgroundColorIndex INTEGER (0..255),
+    pixelAspectRatio INTEGER (0..255)
+}
+
+Gif ::= SEQUENCE {
+    header Header-T,
+    screen LogicalScreenDescriptor
+}
+
+END

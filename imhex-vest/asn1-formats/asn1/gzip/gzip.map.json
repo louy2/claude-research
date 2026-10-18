@@ -1,0 +1,28 @@
+{
+  "module": "Gzip-Module",
+  "root": "Gzip",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "Flags-T", "hexpat": "Flags", "components": [
+      {"name": "padding1", "path": "padding1", "role": "padding", "shape": "int", "optional": false},
+      {"name": "comment", "path": "comment", "role": "field", "shape": "int", "optional": false},
+      {"name": "name", "path": "name", "role": "field", "shape": "int", "optional": false},
+      {"name": "extra", "path": "extra", "role": "field", "shape": "int", "optional": false},
+      {"name": "hcrc", "path": "hcrc", "role": "field", "shape": "int", "optional": false},
+      {"name": "text", "path": "text", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Os-T", "hexpat": "Os", "alias": "int"},
+    {"name": "Gzip", "hexpat": "Gzip", "components": [
+      {"name": "id1", "path": "id1", "role": "field", "shape": "int", "optional": false},
+      {"name": "id2", "path": "id2", "role": "field", "shape": "int", "optional": false},
+      {"name": "compressionMethod", "path": "compressionMethod", "role": "field", "shape": "int", "optional": false},
+      {"name": "flags", "path": "flags", "role": "field", "shape": {"ref": "Flags-T"}, "optional": false},
+      {"name": "mtime", "path": "mtime", "role": "field", "shape": "int", "optional": false},
+      {"name": "extraFlags", "path": "extraFlags", "role": "field", "shape": "int", "optional": false},
+      {"name": "os", "path": "os", "role": "field", "shape": {"ref": "Os-T"}, "optional": false}
+    ]}
+  ]
+}

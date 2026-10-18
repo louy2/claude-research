@@ -1,0 +1,30 @@
+{
+  "module": "Wav-Module",
+  "root": "Wav",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "RiffHeader", "hexpat": "RiffHeader", "components": [
+      {"name": "riff", "path": "riff", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "size", "path": "size", "role": "field", "shape": "int", "optional": false},
+      {"name": "wave", "path": "wave", "role": "field", "shape": "bytes", "optional": false}
+    ]},
+    {"name": "Format-T", "hexpat": "Format", "alias": "int"},
+    {"name": "FmtChunk", "hexpat": "FmtChunk", "components": [
+      {"name": "id", "path": "id", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "size", "path": "size", "role": "field", "shape": "int", "optional": false},
+      {"name": "format", "path": "format", "role": "field", "shape": {"ref": "Format-T"}, "optional": false},
+      {"name": "channels", "path": "channels", "role": "field", "shape": "int", "optional": false},
+      {"name": "sampleRate", "path": "sampleRate", "role": "field", "shape": "int", "optional": false},
+      {"name": "byteRate", "path": "byteRate", "role": "field", "shape": "int", "optional": false},
+      {"name": "blockAlign", "path": "blockAlign", "role": "field", "shape": "int", "optional": false},
+      {"name": "bitsPerSample", "path": "bitsPerSample", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Wav", "hexpat": "Wav", "components": [
+      {"name": "riff", "path": "riff", "role": "field", "shape": {"ref": "RiffHeader"}, "optional": false},
+      {"name": "fmt", "path": "fmt", "role": "field", "shape": {"ref": "FmtChunk"}, "optional": false}
+    ]}
+  ]
+}

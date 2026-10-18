@@ -1,0 +1,29 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Gif-Module DEFINITIONS ::= BEGIN
+
+Header-T [] {
+    signature [],
+    version []
+}
+
+ScreenFlags [] {
+    globalColorTable [encoding pos-int, size 1],
+    colorResolution [encoding pos-int, size 3],
+    sortFlag [encoding pos-int, size 1],
+    globalColorTableSize [encoding pos-int, size 3]
+}
+
+LogicalScreenDescriptor [] {
+    width [encoding pos-int, size 16, endianness little],
+    height [encoding pos-int, size 16, endianness little],
+    flags [],
+    backgroundColorIndex [encoding pos-int, size 8],
+    pixelAspectRatio [encoding pos-int, size 8]
+}
+
+Gif [] {
+    header [],
+    screen []
+}
+
+END

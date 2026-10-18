@@ -1,0 +1,36 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Png-Module DEFINITIONS ::= BEGIN
+
+Signature-T [] {
+    highBit [encoding pos-int, size 8],
+    png [],
+    dosLineEnding [],
+    dosEof [encoding pos-int, size 8],
+    unixLineEnding [encoding pos-int, size 8]
+}
+
+ColorType-T [encoding pos-int, size 8]
+
+Ihdr-T [] {
+    width [encoding pos-int, size 32],
+    height [encoding pos-int, size 32],
+    bitDepth [encoding pos-int, size 8],
+    colorType [],
+    compressionMethod [encoding pos-int, size 8],
+    filterMethod [encoding pos-int, size 8],
+    interlaceMethod [encoding pos-int, size 8]
+}
+
+Chunk [] {
+    length INTEGER [encoding pos-int, size 32],
+    type-field [encoding pos-int, size 32],
+    ihdr [present-when (type-field == 1229472850)],
+    data [present-when (!(type-field == 1229472850)), size length],
+    crc [encoding pos-int, size 32]
+}
+
+Png-T [] {
+    signature []
+}
+
+END

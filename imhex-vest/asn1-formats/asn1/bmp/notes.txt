@@ -1,0 +1,1 @@
+note: `s32` fields are read as unsigned 32-bit integers (ASN1SCC's Scala runtime proves two's complement only for 8 bits; see --twos-complement)

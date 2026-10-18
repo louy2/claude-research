@@ -1,0 +1,67 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Elf-Module DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+-- enum: None = 0, Elf32 = 1, Elf64 = 2
+Class ::= INTEGER (0..255)
+
+-- enum: None = 0, Lsb = 1, Msb = 2
+Data-T ::= INTEGER (0..255)
+
+Ident ::= SEQUENCE {
+    magic OCTET STRING (SIZE(4)),
+    class-field Class,
+    data Data-T,
+    version INTEGER (0..255),
+    osAbi INTEGER (0..255),
+    abiVersion INTEGER (0..255),
+    padding OCTET STRING (SIZE(7))
+}
+
+-- enum: None = 0, Rel = 1, Exec = 2, Dyn = 3, Core = 4
+ObjectType ::= INTEGER (0..65535)
+
+Header32 ::= SEQUENCE {
+    type-field ObjectType,
+    machine INTEGER (0..65535),
+    version INTEGER (0..4294967295),
+    entry-field INTEGER (0..4294967295),
+    phoff INTEGER (0..4294967295),
+    shoff INTEGER (0..4294967295),
+    flags INTEGER (0..4294967295),
+    ehsize INTEGER (0..65535),
+    phentsize INTEGER (0..65535),
+    phnum INTEGER (0..65535),
+    shentsize INTEGER (0..65535),
+    shnum INTEGER (0..65535),
+    shstrndx INTEGER (0..65535)
+}
+
+Header64 ::= SEQUENCE {
+    type-field ObjectType,
+    machine INTEGER (0..65535),
+    version INTEGER (0..4294967295),
+    entry-field INTEGER (0..18446744073709551615),
+    phoff INTEGER (0..18446744073709551615),
+    shoff INTEGER (0..18446744073709551615),
+    flags INTEGER (0..4294967295),
+    ehsize INTEGER (0..65535),
+    phentsize INTEGER (0..65535),
+    phnum INTEGER (0..65535),
+    shentsize INTEGER (0..65535),
+    shnum INTEGER (0..65535),
+    shstrndx INTEGER (0..65535)
+}
+
+Elf ::= SEQUENCE {
+    ident-magic OCTET STRING (SIZE(4)),
+    ident-class Class,
+    ident-data Data-T,
+    ident-version INTEGER (0..255),
+    ident-osAbi INTEGER (0..255),
+    ident-abiVersion INTEGER (0..255),
+    ident-padding OCTET STRING (SIZE(7)),
+    header Header32 OPTIONAL,
+    header2 Header64 OPTIONAL
+}
+
+END

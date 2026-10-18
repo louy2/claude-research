@@ -5,6 +5,7 @@
 //! hexpat run <pattern.hexpat> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N]
 //! hexpat format -p <pattern.hexpat> -i <data> [-I dir]... [-f json] [-m] [-o out.json]
 //! hexpat emit-vest <pattern.hexpat> [-I dir]... [-o out.vest]
+//! hexpat emit-asn1 <pattern.hexpat> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--root TYPE]
 //!
 //! `--json` and `format -f json` produce the same JSON as the reference
 //! implementation's `plcli format -f json`; `-m` adds its metadata fields.
@@ -17,7 +18,7 @@ use hexpat::interp::dump::DumpOptions;
 use hexpat::{Runtime, Value};
 
 fn usage() -> ExitCode {
-    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]");
+    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--root TYPE]");
     ExitCode::from(2)
 }
 
@@ -37,6 +38,9 @@ struct Args {
     root: Option<String>,
     in_vars: Vec<(String, String)>,
     quiet: bool,
+    module: Option<String>,
+    max_len: Option<u64>,
+    twos_complement: bool,
 }
 
 fn parse_args() -> Option<Args> {
@@ -56,6 +60,9 @@ fn parse_args() -> Option<Args> {
         root: None,
         in_vars: Vec::new(),
         quiet: false,
+        module: None,
+        max_len: None,
+        twos_complement: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -73,6 +80,9 @@ fn parse_args() -> Option<Args> {
             "--max-entries" => a.max_entries = it.next()?.parse().ok()?,
             "-o" | "--output" => a.output = Some(PathBuf::from(it.next()?)),
             "--root" => a.root = Some(it.next()?),
+            "--module" => a.module = Some(it.next()?),
+            "--max-len" => a.max_len = Some(it.next()?.parse().ok()?),
+            "--twos-complement" => a.twos_complement = true,
             "--in" => {
                 let kv = it.next()?;
                 let (k, v) = kv.split_once('=')?;
@@ -109,6 +119,7 @@ fn real_main() -> ExitCode {
         "run" => cmd_run(&args),
         "format" => cmd_format(&args),
         "emit-vest" => cmd_emit(&args),
+        "emit-asn1" => cmd_emit_asn1(&args),
         _ => usage(),
     }
 }
@@ -307,4 +318,77 @@ fn cmd_emit(args: &Args) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+/// Writes `<module>.asn`, `<module>.acn`, `<module>.map.json` and
+/// `HexpatHarness.scala` into the `-o` directory, or prints the ASN.1 and
+/// ACN sources without `-o`.
+fn cmd_emit_asn1(args: &Args) -> ExitCode {
+    let Some(pattern) = args.positional.get(1) else { return usage() };
+    let path = Path::new(pattern);
+    let source = match read_pattern(path) {
+        Ok(s) => s,
+        Err(c) => return c,
+    };
+    let mut rt = Runtime::new(Vec::new());
+    for inc in &args.includes {
+        rt.add_include_path(inc);
+    }
+    let program = match rt.load(&source, path.parent()) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}: {}", path.display(), e);
+            return ExitCode::from(1);
+        }
+    };
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("hexpat").to_string();
+    let mut opts = hexpat::emit_asn1::Asn1Options { module: args.module.clone().unwrap_or(stem.clone()), root: args.root.clone(), twos_complement: args.twos_complement, ..Default::default() };
+    if let Some(m) = args.max_len {
+        opts.max_len = m;
+    }
+    let out = match hexpat::emit_asn1::emit_asn1(&program, rt.default_endian, &opts) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("{}: {}", path.display(), e);
+            return ExitCode::from(1);
+        }
+    };
+    match &args.output {
+        Some(dir) => {
+            let file = stem.to_lowercase();
+            let files = [
+                (format!("{}.asn", file), out.asn.clone()),
+                (format!("{}.acn", file), out.acn.clone()),
+                (format!("{}.map.json", file), out.map_json()),
+                ("HexpatHarness.scala".to_string(), out.scala_harness()),
+            ];
+            if let Err(e) = std::fs::create_dir_all(dir) {
+                eprintln!("cannot create {}: {}", dir.display(), e);
+                return ExitCode::from(1);
+            }
+            for (name, text) in files {
+                let p = dir.join(name);
+                if let Err(e) = std::fs::write(&p, text) {
+                    eprintln!("cannot write {}: {}", p.display(), e);
+                    return ExitCode::from(1);
+                }
+            }
+        }
+        None => {
+            emit(&out.asn);
+            emit("\n");
+            emit(&out.acn);
+        }
+    }
+    for note in &out.notes {
+        eprintln!("note: {}", note);
+    }
+    for l in &out.lossy {
+        eprintln!("lossy: {}", l);
+    }
+    if out.root.is_none() && out.trailing.is_none() {
+        eprintln!("{}: the root type could not be emitted", path.display());
+        return ExitCode::from(1);
+    }
+    ExitCode::SUCCESS
 }

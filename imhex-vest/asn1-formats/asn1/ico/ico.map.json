@@ -1,0 +1,32 @@
+{
+  "module": "Ico-Module",
+  "root": "Ico",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "ImageType", "hexpat": "ImageType", "alias": "int"},
+    {"name": "Header", "hexpat": "Header", "components": [
+      {"name": "reserved", "path": "reserved", "role": "field", "shape": "int", "optional": false},
+      {"name": "type-field", "path": "type", "role": "field", "shape": {"ref": "ImageType"}, "optional": false},
+      {"name": "count", "path": "count", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "DirEntry", "hexpat": "DirEntry", "components": [
+      {"name": "width", "path": "width", "role": "field", "shape": "int", "optional": false},
+      {"name": "height", "path": "height", "role": "field", "shape": "int", "optional": false},
+      {"name": "colorCount", "path": "colorCount", "role": "field", "shape": "int", "optional": false},
+      {"name": "reserved", "path": "reserved", "role": "field", "shape": "int", "optional": false},
+      {"name": "planes", "path": "planes", "role": "field", "shape": "int", "optional": false},
+      {"name": "bitCount", "path": "bitCount", "role": "field", "shape": "int", "optional": false},
+      {"name": "size", "path": "size", "role": "field", "shape": "int", "optional": false},
+      {"name": "offset", "path": "offset", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Ico", "hexpat": "Ico", "components": [
+      {"name": "header-reserved", "path": "header.reserved", "role": "field", "shape": "int", "optional": false},
+      {"name": "header-type", "path": "header.type", "role": "field", "shape": {"ref": "ImageType"}, "optional": false},
+      {"name": "header-count", "path": "header.count", "role": "inserted", "shape": "int", "optional": false},
+      {"name": "entries", "path": "entries", "role": "field", "shape": {"seq_of": {"ref": "DirEntry"}}, "optional": false}
+    ]}
+  ]
+}

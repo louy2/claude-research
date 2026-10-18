@@ -1,0 +1,25 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Zip-Module DEFINITIONS ::= BEGIN
+
+Method-T [encoding pos-int, size 16, endianness little]
+
+LocalFileHeader [] {
+    signature [],
+    version [encoding pos-int, size 16, endianness little],
+    flags [encoding pos-int, size 16, endianness little],
+    method [],
+    modTime [encoding pos-int, size 16, endianness little],
+    modDate [encoding pos-int, size 16, endianness little],
+    crc32 [encoding pos-int, size 32, endianness little],
+    compressedSize INTEGER [encoding pos-int, size 32, endianness little],
+    uncompressedSize [encoding pos-int, size 32, endianness little],
+    nameLength INTEGER [encoding pos-int, size 16, endianness little],
+    extraLength INTEGER [encoding pos-int, size 16, endianness little],
+    name [size nameLength],
+    extra [size extraLength],
+    data [size compressedSize]
+}
+
+Zip [] { }
+
+END

@@ -1,0 +1,25 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Gzip-Module DEFINITIONS ::= BEGIN
+
+Flags-T [] {
+    padding1 [encoding pos-int, size 3],
+    comment [encoding pos-int, size 1],
+    name [encoding pos-int, size 1],
+    extra [encoding pos-int, size 1],
+    hcrc [encoding pos-int, size 1],
+    text [encoding pos-int, size 1]
+}
+
+Os-T [encoding pos-int, size 8]
+
+Gzip [] {
+    id1 [encoding pos-int, size 8],
+    id2 [encoding pos-int, size 8],
+    compressionMethod [encoding pos-int, size 8],
+    flags [],
+    mtime [encoding pos-int, size 32, endianness little],
+    extraFlags [encoding pos-int, size 8],
+    os []
+}
+
+END

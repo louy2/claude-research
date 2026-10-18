@@ -1,0 +1,37 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Png-Module DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+Signature-T ::= SEQUENCE {
+    highBit INTEGER (0..255),
+    png OCTET STRING (SIZE(3)),
+    dosLineEnding OCTET STRING (SIZE(2)),
+    dosEof INTEGER (0..255),
+    unixLineEnding INTEGER (0..255)
+}
+
+-- enum: Grayscale = 0, RGB = 2, Palette = 3, GrayscaleAlpha = 4, RGBA = 6
+ColorType-T ::= INTEGER (0..255)
+
+Ihdr-T ::= SEQUENCE {
+    width INTEGER (0..4294967295),
+    height INTEGER (0..4294967295),
+    bitDepth INTEGER (0..255),
+    colorType ColorType-T,
+    compressionMethod INTEGER (0..255),
+    filterMethod INTEGER (0..255),
+    interlaceMethod INTEGER (0..255)
+}
+
+Chunk ::= SEQUENCE {
+    type-field INTEGER (0..4294967295), -- char[4] read as a big-endian integer
+    ihdr Ihdr-T OPTIONAL,
+    data OCTET STRING (SIZE(0..1048576)) OPTIONAL,
+    crc INTEGER (0..4294967295)
+}
+
+-- the trailing `chunks` array (until the end of the input) is decoded by the caller
+Png-T ::= SEQUENCE {
+    signature Signature-T
+}
+
+END

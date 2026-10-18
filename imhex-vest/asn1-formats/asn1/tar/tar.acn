@@ -1,0 +1,24 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Tar DEFINITIONS ::= BEGIN
+
+PosixHeader [] {
+    name [],
+    mode [],
+    uid [],
+    gid [],
+    size [],
+    mtime [],
+    checksum [],
+    typeflag [encoding pos-int, size 8],
+    linkname [],
+    magic [],
+    version [],
+    uname [],
+    gname [],
+    devmajor [],
+    devminor [],
+    prefix [],
+    padding []
+}
+
+END

@@ -1,0 +1,2 @@
+note: `Chunk`: sizes taken from `length` are capped at 1048576 (ASN1SCC needs an upper bound)
+lossy: Chunk.length: derived from data on encoding and written as 0 when it is absent

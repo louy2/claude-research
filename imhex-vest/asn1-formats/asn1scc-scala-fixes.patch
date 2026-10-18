@@ -1,0 +1,215 @@
+diff --git a/BackendAst/Acn/AcnDependencies.fs b/BackendAst/Acn/AcnDependencies.fs
+index 28d4d8a..f67ca66 100644
+--- a/BackendAst/Acn/AcnDependencies.fs
++++ b/BackendAst/Acn/AcnDependencies.fs
+@@ -253,7 +253,12 @@ and private handleSizeDeterminant (ctx: DepContext) (minSize: SIZE) (maxSize: SI
+         let updateStatement =
+             match minSize.acn = maxSize.acn with
+             | true  -> lm.acn.SizeDependencyFixedSize v minSize.acn
+-            | false -> lm.acn.SizeDependency v (lm.acn.getSizeableSize (pSizeable.accessPath.joined lm.lg) (lm.lg.getAccess pSizeable.accessPath) unsigned) minSize.uper maxSize.uper false false child.typeDefinitionBodyWithinSeq
++            | false ->
++                // Under a presence check (checkPath), wrapped optionals (Scala) are unwrapped.
++                let sizeable =
++                    if checkPath.IsEmpty || not lm.lg.usesWrappedOptional then pSizeable.accessPath.joined lm.lg
++                    else pSizeable.accessPath.joinedUnchecked lm.lg FullAccess
++                lm.acn.SizeDependency v (lm.acn.getSizeableSize sizeable (lm.lg.getAccess pSizeable.accessPath) unsigned) minSize.uper maxSize.uper false false child.typeDefinitionBodyWithinSeq
+         match checkPath with
+         | []    -> updateStatement
+         | _     -> lm.acn.checkAccessPath checkPath updateStatement v (initExpr r lm m child.Type)
+diff --git a/BackendAst/Acn/AcnExpression.fs b/BackendAst/Acn/AcnExpression.fs
+index e3fce5a..ce1dd11 100644
+--- a/BackendAst/Acn/AcnExpression.fs
++++ b/BackendAst/Acn/AcnExpression.fs
+@@ -19,7 +19,13 @@ open Language
+ // references via `getChildResult`); `pSeq` is the access path of `seq` in
+ // the generated code; `lm` provides the per-language operator names and
+ // access-path helpers.
+-let acnExpressionToBackendExpression (lm: LanguageMacros) (seq: Asn1AcnAst.Sequence) (pSeq: CodegenScope) (exp: AcnExpression) =
++// With `useIdentifiers`, field references are rendered as the identifiers
++// that copy-decoding backends bind decoded children to (`pVal_field`)
++// instead of selections (`pVal.field`).
++let rec acnExpressionToBackendExpression (lm: LanguageMacros) (seq: Asn1AcnAst.Sequence) (pSeq: CodegenScope) (exp: AcnExpression) =
++    acnExpressionToBackendExpressionWith lm seq pSeq exp false
++
++and acnExpressionToBackendExpressionWith (lm: LanguageMacros) (seq: Asn1AcnAst.Sequence) (pSeq: CodegenScope) (exp: AcnExpression) (useIdentifiers: bool) =
+     let unaryNotOperator = lm.lg.unaryNotOperator
+     let modOp            = lm.lg.modOp
+     let eqOp             = lm.lg.eqOp
+@@ -45,22 +51,25 @@ let acnExpressionToBackendExpression (lm: LanguageMacros) (seq: Asn1AcnAst.Seque
+                 | Asn1AcnAst.AcnChild ch  -> raise (SemanticError(x1.Location, (sprintf "Invalid reference '%s'. Expecting an ASN.1 child" (lp |> Seq.StrJoin "."))))
+                 | Asn1AcnAst.Asn1Child ch  ->
+                     match ch.Type.ActualType.Kind with
+-                    | Asn1AcnAst.Integer        _
++                    | Asn1AcnAst.Integer        i  -> {pSeq with accessPath = lm.lg.getSeqChild pSeq.accessPath (lm.lg.getAsn1ChildBackendName0 ch) false ch.Optionality.IsSome}, i.isUnsigned
+                     | Asn1AcnAst.Real           _
+-                    | Asn1AcnAst.Boolean        _  -> {pSeq with accessPath = lm.lg.getSeqChild pSeq.accessPath (lm.lg.getAsn1ChildBackendName0 ch) false ch.Optionality.IsSome}
++                    | Asn1AcnAst.Boolean        _  -> {pSeq with accessPath = lm.lg.getSeqChild pSeq.accessPath (lm.lg.getAsn1ChildBackendName0 ch) false ch.Optionality.IsSome}, false
+                     | Asn1AcnAst.Sequence s when xs.Length > 1 -> getChildResult s {pSeq with accessPath = lm.lg.getSeqChild pSeq.accessPath (lm.lg.getAsn1ChildBackendName0 ch) false ch.Optionality.IsSome} (RelativePath xs)
+                     | _                 -> raise (SemanticError(x1.Location, (sprintf "Invalid reference '%s'" (lp |> Seq.StrJoin "."))))
+ 
+ 
+     let ret =
+         AcnGenericTypes.foldAcnExpression
+-            (fun i s -> ( (0, i.Value.ToString()) , 0))
++            // Scala (the only backend with wrapped optionals) compares Long values:
++            // literals get an `L` suffix and unsigned fields are read with `toRaw`.
++            (fun i s -> ( (0, i.Value.ToString() + (if lm.lg.usesWrappedOptional then "L" else "")) , 0))
+             (fun i s -> ( (0,"") , 0))
+             (fun i s -> ( (0, i.Value.ToString(FsUtils.doubleParseString, NumberFormatInfo.InvariantInfo)) , 0))
+             (fun i s -> ( (0, i.Value.ToString().ToLower()) , 0))
+             (fun lf s ->
+-                let plf = getChildResult seq pSeq lf
+-                (0, (plf.accessPath.joined lm.lg)) , 0)
++                let plf, isUnsigned = getChildResult seq pSeq lf
++                let ref = if useIdentifiers then plf.accessPath.asIdentifier lm.lg else plf.accessPath.joined lm.lg
++                (0, (if isUnsigned && lm.lg.usesWrappedOptional then ref + ".toRaw" else ref)) , 0)
+             (fun loc (chExpPriority, expStr) s -> printUnary unaryNotOperator chExpPriority expStr 1, 0) //NotUnaryExpression
+             (fun loc (chExpPriority, expStr) s -> printUnary "-" chExpPriority expStr 1, 0)//MinusUnaryExpression
+             (fun l e1 e2  s -> printBinary "+" e1 e2 3, 0 )
+diff --git a/BackendAst/Acn/AcnSequence.fs b/BackendAst/Acn/AcnSequence.fs
+index 9d88c09..e4007ef 100644
+--- a/BackendAst/Acn/AcnSequence.fs
++++ b/BackendAst/Acn/AcnSequence.fs
+@@ -100,6 +100,16 @@ let private mkChildNestingScope (ctx:SequenceChildCtx) (s:SequenceChildState) (c
+             | true  -> Some ctx.bitStreamPositionsLocalVar
+             | false -> ctx.nestingScope.parentSavePositionVar}
+ 
++// True when a `present-when` expression of an optional child is evaluated by
++// the caller of the child's outlined decoding function (copy decoding with
++// wrapped optionals, i.e. Scala): the outlined function only receives the
++// presence flag, not the decoded siblings the expression refers to.
++let private presentWhenInCaller (lm: LanguageMacros) (codec: Codec) (child: Asn1Child) =
++    codec = Decode && lm.lg.decodingKind = Copy && lm.lg.usesWrappedOptional &&
++    (match child.Optionality with
++     | Some (Optional opt) -> (match opt.acnPresentWhen with Some (PresenceWhenBoolExpression _) -> true | _ -> false)
++     | _ -> false)
++
+ // Per-child handler for a regular ASN.1 SEQUENCE component.
+ let private handleAsn1Child
+     (ctx:SequenceChildCtx)
+@@ -163,7 +173,10 @@ let private handleAsn1Child
+                 let _errCodeName = ToC ("ERR_ACN" + ((lm.lg.codecSuffix codec).ToUpper()) + "_" + ((child.Type.id.AcnAbsPath |> Seq.skip 1 |> Seq.StrJoin("-")).Replace("#","elm")) + "_PRESENT_WHEN_EXP_FAILED")
+                 let errFieldPath = match child.Type.id.AcnAbsPath |> Seq.skip 1 |> Seq.toList with [] -> "" | first :: rest -> (String.concat "." ((r.args.TypePrefix + first) :: rest)).Replace("#","elm")
+                 let errCode, ns1a = getNextValidErrorCode ns1 _errCodeName None errFieldPath
+-                let retExp = AcnExpression.acnExpressionToBackendExpression lm o p exp
++                // Backends that decode into fresh values and outline optional
++                // children (Scala) evaluate the expression in the caller, over
++                // the decoded siblings.
++                let retExp = AcnExpression.acnExpressionToBackendExpressionWith lm o p exp (presentWhenInCaller lm codec child)
+                 let existVar =
+                     if codec = Decode then Some (ToC (child._c_name + "_exist"))
+                     else None
+@@ -277,11 +290,15 @@ let private handleAsn1Child
+     let optAux, theCombinedBody =
+         if presentWhenStmts.IsNone && childBody.IsNone then [], None
+         else
++            let inCaller = presentWhenInCaller lm codec child
++            let insideStmts = if inCaller then [] else presentWhenStmts |> Option.toList
+             let combinedBody (p: CodegenScope) (existVar: string option): string =
+-                ((presentWhenStmts |> Option.toList) @ (childBody |> Option.toList) |> List.map (fun f -> f p existVar)) |> Seq.StrJoin "\n"
++                (insideStmts @ (childBody |> Option.toList) |> List.map (fun f -> f p existVar)) |> Seq.StrJoin "\n"
+             let soc = {SequenceOptionalChild.t = t; sq = o; child = child; existVar = existVar; p = {p with accessPath = childSel}; nestingScope = childNestingScope; childBody = combinedBody}
+             let optAux, theCombinedBody = lm.lg.generateOptionalAuxiliaries r ACN soc codec
+-            optAux, Some theCombinedBody
++            match inCaller, presentWhenStmts with
++            | true, Some pw -> optAux, Some ((pw p existVar) + "\n" + theCombinedBody)
++            | _ -> optAux, Some theCombinedBody
+ 
+     let stmts = {body = theCombinedBody; lvs = presentWhenLvs @ childLvs;  userDefinedFunctions=childUserDefFuncs; errCodes = presentWhenErrs @ childErrs; icdComments = []}
+     let props = {info=childInfo.toAsn1AcnAst; sel=childSel; uperMaxOffset=s.uperAccBits; acnMaxOffset=s.acnAccBits}
+diff --git a/StgScala/ProofGen.fs b/StgScala/ProofGen.fs
+index 4d89aad..fe2dd6b 100644
+--- a/StgScala/ProofGen.fs
++++ b/StgScala/ProofGen.fs
+@@ -303,6 +303,18 @@ let renameBindingsSeqSizeRes (res: SeqSizeExprChildRes list) (suffix: string): S
+     }
+   res |> List.map subst
+ 
++// Ghost size variables of nested SEQUENCE children: `nestingIx` identifies the
++// path to the nested SEQUENCE (one base-1000 digit per level), so that two
++// sibling children that are both SEQUENCEs (e.g. two OPTIONAL SEQUENCE
++// components) do not bind the same names. Names with a zero base keep the
++// historical `size_<level>_<ix>` form that the prefix lemmas refer to.
++let nestedSizeBase (nestingIx: bigint) (ix: bigint): bigint = nestingIx * 1000I + ix + 1I
++
++let sizeVarName (nestingLevel: bigint) (nestingIx: bigint) (ix: bigint): string =
++  if nestingLevel = 0I then $"size_{nestingIx + ix}"
++  elif nestingIx = 0I then $"size_{nestingLevel}_{ix}"
++  else $"size_{nestingLevel}_{nestingIx}_{ix}"
++
+ let rec asn1SizeExpr (align: AcnAlignment option)
+                      (tp: Asn1AcnAst.Asn1TypeKind)
+                      (obj: Expr)
+@@ -373,11 +385,11 @@ and seqSizeExprHelperChild (child: SeqChildInfo)
+     match asn1.Optionality with
+     | Some _ ->
+       let someBdg = {Var.name = "v"; tpe = fromAsn1TypeKind asn1.Type.Kind}
+-      let childRes = asn1SizeExpr asn1.Type.acnAlignment asn1.Type.Kind (Var someBdg) offset nestingLevel (nestingIx + ix)
++      let childRes = asn1SizeExpr asn1.Type.acnAlignment asn1.Type.Kind (Var someBdg) offset nestingLevel (nestedSizeBase nestingIx ix)
+       let resSize = optionMutMatchExpr recv.Value (Some someBdg) childRes.resSize (longlit 0I)
+       {bdgs = childRes.bdgs; resSize = resSize}
+     | None ->
+-      asn1SizeExpr asn1.Type.acnAlignment asn1.Type.Kind recv.Value offset nestingLevel (nestingIx + ix)
++      asn1SizeExpr asn1.Type.acnAlignment asn1.Type.Kind recv.Value offset nestingLevel (nestedSizeBase nestingIx ix)
+ 
+ and seqSizeExprHelper (children : SeqChildInfo list)
+                       (obj: Expr)
+@@ -388,9 +400,7 @@ and seqSizeExprHelper (children : SeqChildInfo list)
+ 
+   let childSize (acc: SeqSizeExprChildRes list) (ix0: int, child: SeqChildInfo): SeqSizeExprChildRes list =
+     let ix = bigint (nbPresenceBits + ix0)
+-    let varName =
+-      if nestingLevel = 0I then $"size_{nestingIx + ix}"
+-      else $"size_{nestingLevel}_{nestingIx + ix}"
++    let varName = sizeVarName nestingLevel nestingIx ix
+     let resVar = {Var.name = varName; tpe = IntegerType Long}
+     let accOffset = plus (offset :: (acc |> List.map (fun res -> Var res.childVar)))
+     let recv =
+@@ -401,9 +411,7 @@ and seqSizeExprHelper (children : SeqChildInfo list)
+     acc @ [{extraBdgs = childResSize.bdgs; childVar = resVar; childSize = childResSize.resSize}]
+ 
+   let presenceBitsVars = [0 .. nbPresenceBits - 1] |> List.map (fun i ->
+-    let varName =
+-      if nestingLevel = 0I then $"size_{nestingIx + bigint i}"
+-      else $"size_{nestingLevel}_{nestingIx + bigint i}"
++    let varName = sizeVarName nestingLevel nestingIx (bigint i)
+     {extraBdgs = []; childVar = {name = varName; tpe = IntegerType Long}; childSize = longlit 1I}
+   )
+   children |> List.indexed |> (List.fold childSize presenceBitsVars)
+@@ -1308,9 +1316,23 @@ let generatePrefixLemmaCommon (enc: Asn1Encoding)
+       ]
+     }
+ 
++  // The same match, yielding only `res` (0L on failure); used when there are
++  // too many bindings for a Scala tuple with `_N` accessors (22).
++  let v1SizePatMatOf (res: Expr) =
++    match v1SizePatMat with
++    | MatchExpr m ->
++      let caseOf (i: int) (c: MatchCase) =
++        if i = 0 then {c with rhs = letsIn v1SizeExpr.bdgs res}
++        else {c with rhs = longlit 0I}
++      MatchExpr {m with cases = List.mapi caseOf m.cases}
++    | other -> other
++
+   let preSpecs =
+     let sizeBdgs =
+       if v1SizeExpr.bdgs.IsEmpty then [LetSpec (v1SizeVar, v1SizePatMat)]
++      elif v1SizeExpr.bdgs.Length + 1 > 22 then
++        LetSpec (v1SizeVar, v1SizePatMatOf v1SizeExpr.resSize) ::
++          (v1SizeExpr.bdgs |> List.map (fun (v, _) -> LetSpec (v, v1SizePatMatOf (Var v))))
+       else
+         let v1SizeTuple = {v1SizeVar with name = $"v1SizeTuple"}
+         let tupleBdgs = (v1SizeVar :: (v1SizeExpr.bdgs |> List.map fst)) |> List.indexed |> List.map (fun (i, v) -> LetSpec (v, TupleSelect (Var v1SizeTuple, i + 1)))
+diff --git a/StgScala/acn_scala.stg b/StgScala/acn_scala.stg
+index 9eb3be8..78b1ca3 100644
+--- a/StgScala/acn_scala.stg
++++ b/StgScala/acn_scala.stg
+@@ -760,7 +760,7 @@ sequence_presence_optChild_decode(p, sAcc, sChName, soExistVar, sErrCode) ::= <<
+ >>
+ 
+ sequence_presence_optChild_pres_acn_expression_encode(p, sAcc, sChName, sAcnExpression, soExistVar, sErrCode) ::= <<
+-if <p><sAcc><sChName>.isDefined != <sAcnExpression> then
++if <p>.isDefined != (<sAcnExpression>) then
+     return Left(<sErrCode>)
+ >>
+ sequence_presence_optChild_pres_acn_expression_decode(p, sAcc, sChName, sAcnExpression, soExistVar, sErrCode) ::= <<

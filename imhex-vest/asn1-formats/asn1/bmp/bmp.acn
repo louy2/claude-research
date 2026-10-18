@@ -1,0 +1,33 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Bmp-Module DEFINITIONS ::= BEGIN
+
+BitmapFileHeader [] {
+    signature [],
+    fileSize [encoding pos-int, size 32, endianness little],
+    reserved1 [encoding pos-int, size 16, endianness little],
+    reserved2 [encoding pos-int, size 16, endianness little],
+    pixelDataOffset [encoding pos-int, size 32, endianness little]
+}
+
+Compression-T [encoding pos-int, size 32, endianness little]
+
+BitmapInfoHeader [] {
+    headerSize [encoding pos-int, size 32, endianness little],
+    width [encoding pos-int, size 32, endianness little],
+    height [encoding pos-int, size 32, endianness little],
+    planes [encoding pos-int, size 16, endianness little],
+    bitsPerPixel [encoding pos-int, size 16, endianness little],
+    compression [],
+    imageSize [encoding pos-int, size 32, endianness little],
+    xPixelsPerMeter [encoding pos-int, size 32, endianness little],
+    yPixelsPerMeter [encoding pos-int, size 32, endianness little],
+    colorsUsed [encoding pos-int, size 32, endianness little],
+    importantColors [encoding pos-int, size 32, endianness little]
+}
+
+Bmp [] {
+    file [],
+    info []
+}
+
+END

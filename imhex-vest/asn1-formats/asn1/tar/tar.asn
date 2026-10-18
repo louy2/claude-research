@@ -1,0 +1,24 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Tar DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+PosixHeader ::= SEQUENCE {
+    name OCTET STRING (SIZE(100)),
+    mode OCTET STRING (SIZE(8)),
+    uid OCTET STRING (SIZE(8)),
+    gid OCTET STRING (SIZE(8)),
+    size OCTET STRING (SIZE(12)),
+    mtime OCTET STRING (SIZE(12)),
+    checksum OCTET STRING (SIZE(8)),
+    typeflag INTEGER (0..255),
+    linkname OCTET STRING (SIZE(100)),
+    magic OCTET STRING (SIZE(6)),
+    version OCTET STRING (SIZE(2)),
+    uname OCTET STRING (SIZE(32)),
+    gname OCTET STRING (SIZE(32)),
+    devmajor OCTET STRING (SIZE(8)),
+    devminor OCTET STRING (SIZE(8)),
+    prefix OCTET STRING (SIZE(155)),
+    padding OCTET STRING (SIZE(12))
+}
+
+END

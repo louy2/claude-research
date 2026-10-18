@@ -1,0 +1,29 @@
+{
+  "module": "Zip-Module",
+  "root": null,
+  "trailing": {"field": "entries", "element": "LocalFileHeader"},
+  "max_len": 1048576,
+  "notes": ["`LocalFileHeader`: sizes taken from `compressedSize` are capped at 1048576 (ASN1SCC needs an upper bound)"],
+  "lossy": [],
+  "types": [
+    {"name": "Method-T", "hexpat": "Method", "alias": "int"},
+    {"name": "LocalFileHeader", "hexpat": "LocalFileHeader", "components": [
+      {"name": "signature", "path": "signature", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "version", "path": "version", "role": "field", "shape": "int", "optional": false},
+      {"name": "flags", "path": "flags", "role": "field", "shape": "int", "optional": false},
+      {"name": "method", "path": "method", "role": "field", "shape": {"ref": "Method-T"}, "optional": false},
+      {"name": "modTime", "path": "modTime", "role": "field", "shape": "int", "optional": false},
+      {"name": "modDate", "path": "modDate", "role": "field", "shape": "int", "optional": false},
+      {"name": "crc32", "path": "crc32", "role": "field", "shape": "int", "optional": false},
+      {"name": "compressedSize", "path": "compressedSize", "role": "inserted", "shape": "int", "optional": false},
+      {"name": "uncompressedSize", "path": "uncompressedSize", "role": "field", "shape": "int", "optional": false},
+      {"name": "nameLength", "path": "nameLength", "role": "inserted", "shape": "int", "optional": false},
+      {"name": "extraLength", "path": "extraLength", "role": "inserted", "shape": "int", "optional": false},
+      {"name": "name", "path": "name", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "extra", "path": "extra", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "data", "path": "data", "role": "field", "shape": "bytes", "optional": false}
+    ]},
+    {"name": "Zip", "hexpat": "Zip", "components": [
+    ]}
+  ]
+}

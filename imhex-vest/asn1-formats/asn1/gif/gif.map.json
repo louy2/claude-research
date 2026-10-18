@@ -1,0 +1,31 @@
+{
+  "module": "Gif-Module",
+  "root": "Gif",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "Header-T", "hexpat": "Header", "components": [
+      {"name": "signature", "path": "signature", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "version", "path": "version", "role": "field", "shape": "bytes", "optional": false}
+    ]},
+    {"name": "ScreenFlags", "hexpat": "ScreenFlags", "components": [
+      {"name": "globalColorTable", "path": "globalColorTable", "role": "field", "shape": "int", "optional": false},
+      {"name": "colorResolution", "path": "colorResolution", "role": "field", "shape": "int", "optional": false},
+      {"name": "sortFlag", "path": "sortFlag", "role": "field", "shape": "int", "optional": false},
+      {"name": "globalColorTableSize", "path": "globalColorTableSize", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "LogicalScreenDescriptor", "hexpat": "LogicalScreenDescriptor", "components": [
+      {"name": "width", "path": "width", "role": "field", "shape": "int", "optional": false},
+      {"name": "height", "path": "height", "role": "field", "shape": "int", "optional": false},
+      {"name": "flags", "path": "flags", "role": "field", "shape": {"ref": "ScreenFlags"}, "optional": false},
+      {"name": "backgroundColorIndex", "path": "backgroundColorIndex", "role": "field", "shape": "int", "optional": false},
+      {"name": "pixelAspectRatio", "path": "pixelAspectRatio", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Gif", "hexpat": "Gif", "components": [
+      {"name": "header", "path": "header", "role": "field", "shape": {"ref": "Header-T"}, "optional": false},
+      {"name": "screen", "path": "screen", "role": "field", "shape": {"ref": "LogicalScreenDescriptor"}, "optional": false}
+    ]}
+  ]
+}

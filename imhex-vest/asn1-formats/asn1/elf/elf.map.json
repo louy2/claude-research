@@ -1,0 +1,63 @@
+{
+  "module": "Elf-Module",
+  "root": "Elf",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "Class", "hexpat": "Class", "alias": "int"},
+    {"name": "Data-T", "hexpat": "Data", "alias": "int"},
+    {"name": "Ident", "hexpat": "Ident", "components": [
+      {"name": "magic", "path": "magic", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "class-field", "path": "class", "role": "field", "shape": {"ref": "Class"}, "optional": false},
+      {"name": "data", "path": "data", "role": "field", "shape": {"ref": "Data-T"}, "optional": false},
+      {"name": "version", "path": "version", "role": "field", "shape": "int", "optional": false},
+      {"name": "osAbi", "path": "osAbi", "role": "field", "shape": "int", "optional": false},
+      {"name": "abiVersion", "path": "abiVersion", "role": "field", "shape": "int", "optional": false},
+      {"name": "padding", "path": "padding", "role": "padding", "shape": "bytes", "optional": false}
+    ]},
+    {"name": "ObjectType", "hexpat": "ObjectType", "alias": "int"},
+    {"name": "Header32", "hexpat": "Header32", "components": [
+      {"name": "type-field", "path": "type", "role": "field", "shape": {"ref": "ObjectType"}, "optional": false},
+      {"name": "machine", "path": "machine", "role": "field", "shape": "int", "optional": false},
+      {"name": "version", "path": "version", "role": "field", "shape": "int", "optional": false},
+      {"name": "entry-field", "path": "entry", "role": "field", "shape": "int", "optional": false},
+      {"name": "phoff", "path": "phoff", "role": "field", "shape": "int", "optional": false},
+      {"name": "shoff", "path": "shoff", "role": "field", "shape": "int", "optional": false},
+      {"name": "flags", "path": "flags", "role": "field", "shape": "int", "optional": false},
+      {"name": "ehsize", "path": "ehsize", "role": "field", "shape": "int", "optional": false},
+      {"name": "phentsize", "path": "phentsize", "role": "field", "shape": "int", "optional": false},
+      {"name": "phnum", "path": "phnum", "role": "field", "shape": "int", "optional": false},
+      {"name": "shentsize", "path": "shentsize", "role": "field", "shape": "int", "optional": false},
+      {"name": "shnum", "path": "shnum", "role": "field", "shape": "int", "optional": false},
+      {"name": "shstrndx", "path": "shstrndx", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Header64", "hexpat": "Header64", "components": [
+      {"name": "type-field", "path": "type", "role": "field", "shape": {"ref": "ObjectType"}, "optional": false},
+      {"name": "machine", "path": "machine", "role": "field", "shape": "int", "optional": false},
+      {"name": "version", "path": "version", "role": "field", "shape": "int", "optional": false},
+      {"name": "entry-field", "path": "entry", "role": "field", "shape": "int", "optional": false},
+      {"name": "phoff", "path": "phoff", "role": "field", "shape": "int", "optional": false},
+      {"name": "shoff", "path": "shoff", "role": "field", "shape": "int", "optional": false},
+      {"name": "flags", "path": "flags", "role": "field", "shape": "int", "optional": false},
+      {"name": "ehsize", "path": "ehsize", "role": "field", "shape": "int", "optional": false},
+      {"name": "phentsize", "path": "phentsize", "role": "field", "shape": "int", "optional": false},
+      {"name": "phnum", "path": "phnum", "role": "field", "shape": "int", "optional": false},
+      {"name": "shentsize", "path": "shentsize", "role": "field", "shape": "int", "optional": false},
+      {"name": "shnum", "path": "shnum", "role": "field", "shape": "int", "optional": false},
+      {"name": "shstrndx", "path": "shstrndx", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Elf", "hexpat": "Elf", "components": [
+      {"name": "ident-magic", "path": "ident.magic", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "ident-class", "path": "ident.class", "role": "field", "shape": {"ref": "Class"}, "optional": false},
+      {"name": "ident-data", "path": "ident.data", "role": "field", "shape": {"ref": "Data-T"}, "optional": false},
+      {"name": "ident-version", "path": "ident.version", "role": "field", "shape": "int", "optional": false},
+      {"name": "ident-osAbi", "path": "ident.osAbi", "role": "field", "shape": "int", "optional": false},
+      {"name": "ident-abiVersion", "path": "ident.abiVersion", "role": "field", "shape": "int", "optional": false},
+      {"name": "ident-padding", "path": "ident.padding", "role": "padding", "shape": "bytes", "optional": false},
+      {"name": "header", "path": "header", "role": "field", "shape": {"ref": "Header32"}, "optional": true},
+      {"name": "header2", "path": "header", "role": "field", "shape": {"ref": "Header64"}, "optional": true}
+    ]}
+  ]
+}

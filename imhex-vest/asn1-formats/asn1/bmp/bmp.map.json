@@ -1,0 +1,35 @@
+{
+  "module": "Bmp-Module",
+  "root": "Bmp",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": ["`s32` fields are read as unsigned 32-bit integers (ASN1SCC's Scala runtime proves two's complement only for 8 bits; see --twos-complement)"],
+  "lossy": [],
+  "types": [
+    {"name": "BitmapFileHeader", "hexpat": "BitmapFileHeader", "components": [
+      {"name": "signature", "path": "signature", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "fileSize", "path": "fileSize", "role": "field", "shape": "int", "optional": false},
+      {"name": "reserved1", "path": "reserved1", "role": "field", "shape": "int", "optional": false},
+      {"name": "reserved2", "path": "reserved2", "role": "field", "shape": "int", "optional": false},
+      {"name": "pixelDataOffset", "path": "pixelDataOffset", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Compression-T", "hexpat": "Compression", "alias": "int"},
+    {"name": "BitmapInfoHeader", "hexpat": "BitmapInfoHeader", "components": [
+      {"name": "headerSize", "path": "headerSize", "role": "field", "shape": "int", "optional": false},
+      {"name": "width", "path": "width", "role": "field", "shape": {"unsigned": 32}, "optional": false},
+      {"name": "height", "path": "height", "role": "field", "shape": {"unsigned": 32}, "optional": false},
+      {"name": "planes", "path": "planes", "role": "field", "shape": "int", "optional": false},
+      {"name": "bitsPerPixel", "path": "bitsPerPixel", "role": "field", "shape": "int", "optional": false},
+      {"name": "compression", "path": "compression", "role": "field", "shape": {"ref": "Compression-T"}, "optional": false},
+      {"name": "imageSize", "path": "imageSize", "role": "field", "shape": "int", "optional": false},
+      {"name": "xPixelsPerMeter", "path": "xPixelsPerMeter", "role": "field", "shape": {"unsigned": 32}, "optional": false},
+      {"name": "yPixelsPerMeter", "path": "yPixelsPerMeter", "role": "field", "shape": {"unsigned": 32}, "optional": false},
+      {"name": "colorsUsed", "path": "colorsUsed", "role": "field", "shape": "int", "optional": false},
+      {"name": "importantColors", "path": "importantColors", "role": "field", "shape": "int", "optional": false}
+    ]},
+    {"name": "Bmp", "hexpat": "Bmp", "components": [
+      {"name": "file", "path": "file", "role": "field", "shape": {"ref": "BitmapFileHeader"}, "optional": false},
+      {"name": "info", "path": "info", "role": "field", "shape": {"ref": "BitmapInfoHeader"}, "optional": false}
+    ]}
+  ]
+}

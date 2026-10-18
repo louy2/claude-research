@@ -1,0 +1,19 @@
+{
+  "module": "Qoi-Module",
+  "root": "Qoi",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "Channels-T", "hexpat": "Channels", "alias": "int"},
+    {"name": "Colorspace-T", "hexpat": "Colorspace", "alias": "int"},
+    {"name": "Qoi", "hexpat": "Qoi", "components": [
+      {"name": "magic", "path": "magic", "role": "magic", "shape": {"chars_int": 4}, "optional": false},
+      {"name": "width", "path": "width", "role": "field", "shape": "int", "optional": false},
+      {"name": "height", "path": "height", "role": "field", "shape": "int", "optional": false},
+      {"name": "channels", "path": "channels", "role": "field", "shape": {"ref": "Channels-T"}, "optional": false},
+      {"name": "colorspace", "path": "colorspace", "role": "field", "shape": {"ref": "Colorspace-T"}, "optional": false}
+    ]}
+  ]
+}

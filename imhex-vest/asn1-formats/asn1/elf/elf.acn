@@ -1,0 +1,64 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Elf-Module DEFINITIONS ::= BEGIN
+
+Class [encoding pos-int, size 8]
+
+Data-T [encoding pos-int, size 8]
+
+Ident [] {
+    magic [],
+    class-field [],
+    data [],
+    version [encoding pos-int, size 8],
+    osAbi [encoding pos-int, size 8],
+    abiVersion [encoding pos-int, size 8],
+    padding []
+}
+
+ObjectType [encoding pos-int, size 16, endianness little]
+
+Header32 [] {
+    type-field [],
+    machine [encoding pos-int, size 16, endianness little],
+    version [encoding pos-int, size 32, endianness little],
+    entry-field [encoding pos-int, size 32, endianness little],
+    phoff [encoding pos-int, size 32, endianness little],
+    shoff [encoding pos-int, size 32, endianness little],
+    flags [encoding pos-int, size 32, endianness little],
+    ehsize [encoding pos-int, size 16, endianness little],
+    phentsize [encoding pos-int, size 16, endianness little],
+    phnum [encoding pos-int, size 16, endianness little],
+    shentsize [encoding pos-int, size 16, endianness little],
+    shnum [encoding pos-int, size 16, endianness little],
+    shstrndx [encoding pos-int, size 16, endianness little]
+}
+
+Header64 [] {
+    type-field [],
+    machine [encoding pos-int, size 16, endianness little],
+    version [encoding pos-int, size 32, endianness little],
+    entry-field [encoding pos-int, size 64, endianness little],
+    phoff [encoding pos-int, size 64, endianness little],
+    shoff [encoding pos-int, size 64, endianness little],
+    flags [encoding pos-int, size 32, endianness little],
+    ehsize [encoding pos-int, size 16, endianness little],
+    phentsize [encoding pos-int, size 16, endianness little],
+    phnum [encoding pos-int, size 16, endianness little],
+    shentsize [encoding pos-int, size 16, endianness little],
+    shnum [encoding pos-int, size 16, endianness little],
+    shstrndx [encoding pos-int, size 16, endianness little]
+}
+
+Elf [] {
+    ident-magic [],
+    ident-class [],
+    ident-data [],
+    ident-version [encoding pos-int, size 8],
+    ident-osAbi [encoding pos-int, size 8],
+    ident-abiVersion [encoding pos-int, size 8],
+    ident-padding [],
+    header [present-when (ident-class == 1)],
+    header2 [present-when (!(ident-class == 1) and (ident-class == 2))]
+}
+
+END

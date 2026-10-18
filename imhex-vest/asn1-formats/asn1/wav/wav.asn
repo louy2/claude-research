@@ -1,0 +1,29 @@
+-- Generated from an ImHex pattern by hexpat's ASN.1/ACN emitter.
+Wav-Module DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+RiffHeader ::= SEQUENCE {
+    riff OCTET STRING (SIZE(4)),
+    size INTEGER (0..4294967295),
+    wave OCTET STRING (SIZE(4))
+}
+
+-- enum: PCM = 1, IEEEFloat = 3, ALaw = 6, MuLaw = 7, Extensible = 65534
+Format-T ::= INTEGER (0..65535)
+
+FmtChunk ::= SEQUENCE {
+    id OCTET STRING (SIZE(4)),
+    size INTEGER (0..4294967295),
+    format Format-T,
+    channels INTEGER (0..65535),
+    sampleRate INTEGER (0..4294967295),
+    byteRate INTEGER (0..4294967295),
+    blockAlign INTEGER (0..65535),
+    bitsPerSample INTEGER (0..65535)
+}
+
+Wav ::= SEQUENCE {
+    riff RiffHeader,
+    fmt FmtChunk
+}
+
+END

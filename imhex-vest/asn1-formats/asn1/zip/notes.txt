@@ -1,0 +1,1 @@
+note: `LocalFileHeader`: sizes taken from `compressedSize` are capped at 1048576 (ASN1SCC needs an upper bound)

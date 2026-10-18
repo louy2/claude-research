@@ -1,0 +1,29 @@
+{
+  "module": "Tar",
+  "root": "PosixHeader",
+  "trailing": null,
+  "max_len": 1048576,
+  "notes": [],
+  "lossy": [],
+  "types": [
+    {"name": "PosixHeader", "hexpat": "PosixHeader", "components": [
+      {"name": "name", "path": "name", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "mode", "path": "mode", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "uid", "path": "uid", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "gid", "path": "gid", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "size", "path": "size", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "mtime", "path": "mtime", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "checksum", "path": "checksum", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "typeflag", "path": "typeflag", "role": "field", "shape": "int", "optional": false},
+      {"name": "linkname", "path": "linkname", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "magic", "path": "magic", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "version", "path": "version", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "uname", "path": "uname", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "gname", "path": "gname", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "devmajor", "path": "devmajor", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "devminor", "path": "devminor", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "prefix", "path": "prefix", "role": "field", "shape": "bytes", "optional": false},
+      {"name": "padding", "path": "padding", "role": "padding", "shape": "bytes", "optional": false}
+    ]}
+  ]
+}

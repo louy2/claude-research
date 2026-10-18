@@ -5,9 +5,11 @@
 //! - [`reader`]: primitive decoding through `vest_lib` combinators.
 //! - [`interp`]: an evaluator that produces an ImHex-style pattern tree.
 //! - [`emit`]: translation of the declarative subset to the Vest DSL.
+//! - [`emit_asn1`]: translation of the declarative subset to ASN.1 + ACN.
 
 pub mod ast;
 pub mod emit;
+pub mod emit_asn1;
 pub mod error;
 pub mod interp;
 pub mod lower;
