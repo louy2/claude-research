@@ -1,0 +1,17 @@
+[package]
+name = "interval-vest"
+version = "0.1.0"
+description = "Interval parsing with root-relative jumps and ranked termination on vest_lib, with a verified strict ZIP profile"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vest_lib = { workspace = true }
+vstd = { workspace = true, features = ["std"] }
+
+[package.metadata.verus]
+verify = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)"] }

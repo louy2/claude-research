@@ -1,0 +1,71 @@
+// ZIP records as separate regions, for the ranked-jump driver in src/ranked.rs.
+// Canonical profile: single disk, no encryption, no data descriptors,
+// stored or deflated entries, no ZIP64.
+
+!LITTLE_ENDIAN
+
+// End of central directory record; the region runs to the end of the file.
+eocd = {
+  const signature: [u8; 4] = [0x50, 0x4b, 0x05, 0x06],
+  const disk: u16 = 0,
+  const cd_disk: u16 = 0,
+  entries_disk: u16,
+  entries_total: u16,
+  cd_size: u32,
+  cd_offset: u32,
+  @comment_len: u16,
+  comment: [u8; @comment_len],
+}
+
+// Bits 1-2 (deflate options) and 11 (UTF-8 names) only.
+flags = u16 | {0x0000, 0x0002, 0x0004, 0x0006, 0x0800, 0x0802, 0x0804, 0x0806}
+
+method = u16 | {0, 8}
+
+// The fields a local file header repeats from its central directory entry.
+file_info = {
+  version_needed: u16,
+  flags: flags,
+  method: method,
+  mod_time: u16,
+  mod_date: u16,
+  crc32: u32,
+  @compressed_size: u32,
+  uncompressed_size: u32,
+}
+
+cd_attrs = {
+  const disk_start: u16 = 0,
+  internal_attr: u16,
+  external_attr: u32,
+  local_header_offset: u32,
+}
+
+cd_entry = {
+  const signature: [u8; 4] = [0x50, 0x4b, 0x01, 0x02],
+  version_made_by: u16,
+  info: file_info,
+  @name_len: u16,
+  @extra_len: u16,
+  @comment_len: u16,
+  attrs: cd_attrs,
+  name: [u8; @name_len],
+  extra: [u8; @extra_len],
+  comment: [u8; @comment_len],
+}
+
+// The central directory fills its region [cd_offset, cd_offset + cd_size)
+// exactly; the entry count is checked against the EOCD as a link.
+central_directory = {
+  entries: Vec<cd_entry>,
+}
+
+local_file = {
+  const signature: [u8; 4] = [0x50, 0x4b, 0x03, 0x04],
+  @info: file_info,
+  @name_len: u16,
+  @extra_len: u16,
+  name: [u8; @name_len],
+  extra: [u8; @extra_len],
+  data: [u8; @info.compressed_size],
+}

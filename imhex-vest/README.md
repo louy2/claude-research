@@ -32,6 +32,14 @@ A Rust toolchain for the [ImHex pattern language](https://docs.werwolv.net/patte
    agrees), and the Stainless results: all 12,259 safety VCs of the ten
    formats are valid, and QOI's `decode(encode(v)) == v` is fully proven
    with `--inline-enums`.
+6. **`interval-vest`** – root-relative intervals and ranked jumps on top of
+   `vest_lib`, the extension of Interval Parsing Grammars that
+   directory-based formats need. A Verus-verified driver follows offsets
+   found in parsed values, and terminates because every jump goes to a
+   lower rank. It accepts a file only if the regions tile it, which makes
+   the parse non-malleable. It is instantiated for a strict ZIP profile:
+   end record → central directory → local files.
+   See [`interval-vest/README.md`](interval-vest/README.md).
 
 ```
 formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib primitives)──▶ pattern tree
@@ -55,7 +63,8 @@ formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib prim
 | `hexpat/src/bin/hexpat.rs` | CLI: `parse`, `run`, `emit-vest` |
 | `formats/` | CC0 patterns for popular formats (declarative subset) |
 | `vest-formats/` | generated `.vest` + generated verified Rust + end-to-end tests |
-| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
+| `interval-vest/` | `At`, backward scan and ranked-jump driver (`src/ranked.rs`), strict ZIP profile (`src/zip.rs`, `vest/zip_regions.vest`), ZIP fixtures |
+| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-verus.sh`, `verify-vest.sh`, `make-zip-fixtures.py`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
 
 ## Usage
 
@@ -165,10 +174,17 @@ are reported as notes and the affected struct is left out rather than
 emitted incorrectly. Signed integers and floats are emitted as their
 unsigned width with a note, because the Vest DSL does not expose them yet.
 
-`scripts/regen-formats.sh` (needs `cargo install vest`) regenerates
-`vest-formats/vest/*.vest` and `vest-formats/src/gen/*.rs`. The generated
-Rust builds with plain cargo; `cargo verus verify` checks the proofs when
-Verus is installed.
+`scripts/regen-formats.sh` (needs `cargo install vest --version 0.2.1`)
+regenerates `vest-formats/vest/*.vest` and `vest-formats/src/gen/*.rs`. The
+generated Rust builds with plain cargo. `scripts/setup-verus.sh` installs the
+Verus release that matches the pinned vstd, and `scripts/verify-vest.sh`
+checks the proofs:
+
+```console
+$ scripts/verify-vest.sh
+vest-formats: verification results:: 895 verified, 0 errors (exit 0)
+interval-vest: verification results:: 200 verified, 0 errors (exit 0)
+```
 
 ## hexpat → ASN.1/ACN
 
@@ -192,6 +208,11 @@ $ cd tree-sitter-hexpat && tree-sitter test
 `hexpat/tests/asn1.rs` checks the committed ASN.1/ACN specs against the
 emitter and, once `scripts/regen-asn1.sh` has built the ASN1SCC decoders,
 compares them field by field with the interpreter.
+
+`interval-vest/tests/zip_profile.rs` runs the verified strict ZIP parser on
+real archives (Python `zipfile`, Info-ZIP) and on archives that each break
+one property: a gap, an overlap, a name mismatch, a fake end record in the
+comment, and so on. It also checks the stage at which each one is rejected.
 
 `vest-formats/tests/formats.rs` builds a synthetic file for each format,
 parses it with the verified parser, evaluates the same bytes with the

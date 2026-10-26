@@ -1,5 +1,5 @@
 [workspace]
-members = ["tree-sitter-hexpat", "hexpat", "vest-formats"]
+members = ["tree-sitter-hexpat", "hexpat", "vest-formats", "interval-vest"]
 resolver = "2"
 
 [workspace.package]

@@ -15,3 +15,6 @@ hexpat = { path = "../hexpat" }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)"] }
+
+[package.metadata.verus]
+verify = true
