@@ -15,12 +15,17 @@
 //!
 //! The main theorem ([`ranked::theorem_non_malleable`]) says that two inputs
 //! accepted with the same regions and values are the same bytes. [`zip`]
-//! instantiates the driver for a strict ZIP profile.
+//! instantiates the driver for a strict ZIP profile, and [`parquet`] for a
+//! strict Parquet profile, whose FileMetaData and page headers go through
+//! the canonical Thrift compact codec in [`thrift`].
 #![allow(non_snake_case, non_camel_case_types, dead_code, unused_imports)]
 
 pub mod gen {
+    pub mod parquet_regions;
     pub mod zip_regions;
 }
 
+pub mod parquet;
 pub mod ranked;
+pub mod thrift;
 pub mod zip;

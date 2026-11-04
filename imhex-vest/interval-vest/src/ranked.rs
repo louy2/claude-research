@@ -674,6 +674,13 @@ pub trait RankedFormatExec<'a>: RankedFormat {
 
     type EVal: DeepView<V = Self::Val>;
 
+    /// An invariant of the values `parse_node` returns, which the other
+    /// methods may rely on (e.g. that a parsed tree is no deeper than its
+    /// parser allowed).
+    open spec fn val_inv(&self, v: Self::EVal) -> bool {
+        true
+    }
+
     fn rank_of(&self, k: Self::EKind) -> (r: u64)
         ensures
             r as nat == self.rank(k@),
@@ -682,14 +689,19 @@ pub trait RankedFormatExec<'a>: RankedFormat {
     fn parse_node(&self, k: Self::EKind, s: &'a [u8]) -> (res: Option<(usize, Self::EVal)>)
         ensures
             opt_matches(res, self.spec_parse_node(k@, s@)),
+            res matches Some((_, v)) ==> self.val_inv(v),
     ;
 
     fn node_ok(&self, k: Self::EKind, v: &Self::EVal) -> (b: bool)
+        requires
+            self.val_inv(*v),
         ensures
             b == self.spec_node_ok(k@, v.deep_view()),
     ;
 
     fn jumps(&self, k: Self::EKind, v: &Self::EVal, root_len: usize) -> (js: Vec<EJump<Self::EKind>>)
+        requires
+            self.val_inv(*v),
         ensures
             js@.len() == self.spec_jumps(k@, v.deep_view(), root_len as int).len(),
             forall|i: int|
@@ -708,6 +720,9 @@ pub trait RankedFormatExec<'a>: RankedFormat {
         child_kind: Self::EKind,
         child_val: &Self::EVal,
     ) -> (b: bool)
+        requires
+            self.val_inv(*v),
+            self.val_inv(*child_val),
         ensures
             b == self.spec_link_ok(k@, v.deep_view(), i as int, child_kind@, child_val.deep_view()),
     ;
@@ -734,6 +749,7 @@ pub fn resolve<'a, F: RankedFormatExec<'a>>(f: &F, root: &'a [u8], j: EJump<F::E
             Some(rs) => spec_resolve(*f, root@, j@) == Some(dv_regions(rs@)),
             None => spec_resolve(*f, root@, j@) is None,
         },
+        res matches Some(rs) ==> forall|q: int| 0 <= q < rs@.len() ==> f.val_inv(#[trigger] rs@[q].val),
     decreases f.rank(j.kind@),
 {
     if !(j.l <= j.r && j.r <= root.len()) {
@@ -764,6 +780,7 @@ pub fn resolve<'a, F: RankedFormatExec<'a>>(f: &F, root: &'a [u8], j: EJump<F::E
             spec_resolve_children(*f, root@, j.kind@, v.deep_view(), sjs, i as nat) == Some(
                 dv_regions(acc@),
             ),
+            forall|q: int| 0 <= q < acc@.len() ==> f.val_inv(#[trigger] acc@[q].val),
         decreases js@.len() - i,
     {
         let c = js[i];
@@ -833,6 +850,13 @@ pub fn resolve<'a, F: RankedFormatExec<'a>>(f: &F, root: &'a [u8], j: EJump<F::E
         acc.append(&mut child);
         proof {
             assert(dv_regions(acc@) =~= dv_regions(old_acc) + dv_regions(child_v));
+            assert forall|q: int| 0 <= q < acc@.len() implies f.val_inv(#[trigger] acc@[q].val) by {
+                if q < old_acc.len() {
+                    assert(acc@[q] == old_acc[q]);
+                } else {
+                    assert(acc@[q] == child_v[q - old_acc.len()]);
+                }
+            }
         }
         i += 1;
     }
@@ -843,6 +867,11 @@ pub fn resolve<'a, F: RankedFormatExec<'a>>(f: &F, root: &'a [u8], j: EJump<F::E
     out.append(&mut acc);
     proof {
         assert(dv_regions(out@) =~= seq![me.deep_view()] + dv_regions(acc_v));
+        assert forall|q: int| 0 <= q < out@.len() implies f.val_inv(#[trigger] out@[q].val) by {
+            if q > 0 {
+                assert(out@[q] == acc_v[q - 1]);
+            }
+        }
     }
     Some(out)
 }
@@ -1042,6 +1071,141 @@ pub fn parse_file<'a, F: RankedFormatExec<'a>>(f: &F, root: &'a [u8]) -> (res: O
     } else {
         None
     }
+}
+
+// ============================================================
+// A layout for formats whose regions have no fixed order
+// ============================================================
+
+/// Region `a` sorts before region `b`: lower start, or the same start and
+/// a shorter length (so an empty region comes before one starting there).
+pub open spec fn key_lt<K, V>(rs: Seq<SRegion<K, V>>, a: int, b: int) -> bool {
+    rs[a].start < rs[b].start || (rs[a].start == rs[b].start && rs[a].len < rs[b].len)
+}
+
+/// Where insertion sort puts `x` into `o`, scanning down from position `k`.
+pub open spec fn ins_pos<K, V>(rs: Seq<SRegion<K, V>>, o: Seq<int>, x: int, k: int) -> int
+    decreases k,
+{
+    if k <= 0 {
+        0
+    } else if key_lt(rs, x, o[k - 1]) {
+        ins_pos(rs, o, x, k - 1)
+    } else {
+        k
+    }
+}
+
+pub proof fn lemma_ins_pos_bounds<K, V>(rs: Seq<SRegion<K, V>>, o: Seq<int>, x: int, k: int)
+    requires
+        0 <= k,
+    ensures
+        0 <= ins_pos(rs, o, x, k) <= k,
+    decreases k,
+{
+    if k > 0 {
+        lemma_ins_pos_bounds(rs, o, x, k - 1);
+    }
+}
+
+/// Insertion sort of the first `n` region indices by [`key_lt`].
+pub open spec fn sorted_upto<K, V>(rs: Seq<SRegion<K, V>>, n: nat) -> Seq<int>
+    decreases n,
+{
+    if n == 0 {
+        seq![]
+    } else {
+        let o = sorted_upto(rs, (n - 1) as nat);
+        o.insert(ins_pos(rs, o, n - 1, o.len() as int), n - 1)
+    }
+}
+
+/// The regions in order of start offset. The tiling check then requires
+/// them to be contiguous and each to appear once.
+pub open spec fn spec_sorted_layout<K, V>(rs: Seq<SRegion<K, V>>) -> Seq<int> {
+    sorted_upto(rs, rs.len())
+}
+
+pub proof fn lemma_sorted_upto<K, V>(rs: Seq<SRegion<K, V>>, n: nat)
+    ensures
+        sorted_upto(rs, n).len() == n,
+        forall|q: int| 0 <= q < n ==> 0 <= #[trigger] sorted_upto(rs, n)[q] < n,
+    decreases n,
+{
+    if n > 0 {
+        let o = sorted_upto(rs, (n - 1) as nat);
+        lemma_sorted_upto(rs, (n - 1) as nat);
+        lemma_ins_pos_bounds(rs, o, n - 1, o.len() as int);
+        let p = ins_pos(rs, o, n - 1, o.len() as int);
+        let o2 = o.insert(p, n - 1);
+        assert forall|q: int| 0 <= q < n implies 0 <= #[trigger] o2[q] < n by {
+            if q < p {
+                assert(o2[q] == o[q]);
+            } else if q > p {
+                assert(o2[q] == o[q - 1]);
+            }
+        }
+    }
+}
+
+pub fn sorted_layout<K: View, V: DeepView>(rs: &Vec<ERegion<K, V>>) -> (o: Vec<usize>)
+    ensures
+        dv_order(o@) == spec_sorted_layout(dv_regions(rs@)),
+{
+    let ghost srs = dv_regions(rs@);
+    let mut o: Vec<usize> = Vec::new();
+    let mut x: usize = 0;
+    assert(dv_order(o@) =~= sorted_upto(srs, 0));
+    while x < rs.len()
+        invariant
+            srs == dv_regions(rs@),
+            x <= rs@.len(),
+            dv_order(o@) == sorted_upto(srs, x as nat),
+            o@.len() == x,
+            forall|q: int| 0 <= q < o@.len() ==> #[trigger] o@[q] < x,
+        decreases rs@.len() - x,
+    {
+        let ghost so = dv_order(o@);
+        let mut p = o.len();
+        while p > 0 && (rs[x].start < rs[o[p - 1]].start || (rs[x].start == rs[o[p - 1]].start
+            && rs[x].len < rs[o[p - 1]].len))
+            invariant
+                srs == dv_regions(rs@),
+                x < rs@.len(),
+                so == dv_order(o@),
+                p <= o@.len(),
+                forall|q: int| 0 <= q < o@.len() ==> #[trigger] o@[q] < x,
+                ins_pos(srs, so, x as int, so.len() as int) == ins_pos(srs, so, x as int, p as int),
+            decreases p,
+        {
+            assert(srs[x as int] == rs@[x as int].deep_view());
+            assert(so[p - 1] == o@[p - 1] as int);
+            assert(srs[so[p - 1]] == rs@[o@[p - 1] as int].deep_view());
+            p -= 1;
+        }
+        proof {
+            assert(srs[x as int] == rs@[x as int].deep_view());
+            if p > 0 {
+                assert(so[p - 1] == o@[p - 1] as int);
+                assert(srs[so[p - 1]] == rs@[o@[p - 1] as int].deep_view());
+            }
+            lemma_sorted_upto(srs, x as nat);
+        }
+        let ghost old_o = o@;
+        o.insert(p, x);
+        proof {
+            assert(dv_order(o@) =~= so.insert(p as int, x as int));
+            assert forall|q: int| 0 <= q < o@.len() implies #[trigger] o@[q] < x + 1 by {
+                if q < p {
+                    assert(o@[q] == old_o[q]);
+                } else if q > p {
+                    assert(o@[q] == old_o[q - 1]);
+                }
+            }
+        }
+        x += 1;
+    }
+    o
 }
 
 } // verus!

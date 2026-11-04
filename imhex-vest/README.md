@@ -37,8 +37,12 @@ A Rust toolchain for the [ImHex pattern language](https://docs.werwolv.net/patte
    directory-based formats need. A Verus-verified driver follows offsets
    found in parsed values, and terminates because every jump goes to a
    lower rank. It accepts a file only if the regions tile it, which makes
-   the parse non-malleable. It is instantiated for a strict ZIP profile:
-   end record → central directory → local files.
+   the parse non-malleable. It is instantiated for two strict profiles:
+   - ZIP: end record → central directory → local files;
+   - Parquet: tail → FileMetaData → chunks, page indexes, bloom filters and
+     legacy inline copies. Thrift compact is parsed by a verified codec that
+     accepts only the canonical encoding.
+
    See [`interval-vest/README.md`](interval-vest/README.md).
 
 ```
@@ -63,8 +67,8 @@ formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib prim
 | `hexpat/src/bin/hexpat.rs` | CLI: `parse`, `run`, `emit-vest` |
 | `formats/` | CC0 patterns for popular formats (declarative subset) |
 | `vest-formats/` | generated `.vest` + generated verified Rust + end-to-end tests |
-| `interval-vest/` | `At`, backward scan and ranked-jump driver (`src/ranked.rs`), strict ZIP profile (`src/zip.rs`, `vest/zip_regions.vest`), ZIP fixtures |
-| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-verus.sh`, `verify-vest.sh`, `make-zip-fixtures.py`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
+| `interval-vest/` | `At`, backward scan and ranked-jump driver (`src/ranked.rs`), canonical Thrift compact (`src/thrift.rs`), strict ZIP and Parquet profiles (`src/zip.rs`, `src/parquet.rs`, `vest/*.vest`), fixtures |
+| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-verus.sh`, `verify-vest.sh`, `make-zip-fixtures.py`, `make-parquet-fixtures.py`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
 
 ## Usage
 
@@ -183,7 +187,7 @@ checks the proofs:
 ```console
 $ scripts/verify-vest.sh
 vest-formats: verification results:: 895 verified, 0 errors (exit 0)
-interval-vest: verification results:: 200 verified, 0 errors (exit 0)
+interval-vest: verification results:: 338 verified, 0 errors (exit 0)
 ```
 
 ## hexpat → ASN.1/ACN
@@ -213,6 +217,10 @@ compares them field by field with the interpreter.
 real archives (Python `zipfile`, Info-ZIP) and on archives that each break
 one property: a gap, an overlap, a name mismatch, a fake end record in the
 comment, and so on. It also checks the stage at which each one is rejected.
+`interval-vest/tests/parquet_profile.rs` does the same for Parquet files from
+pyarrow, DuckDB, fastparquet and Polars, plus single-property mutations
+(including three non-canonical encodings of the same FileMetaData), and
+checks the canonical Thrift rules on hand-written encodings.
 
 `vest-formats/tests/formats.rs` builds a synthetic file for each format,
 parses it with the verified parser, evaluates the same bytes with the

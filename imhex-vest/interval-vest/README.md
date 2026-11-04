@@ -2,8 +2,10 @@
 
 A prototype of the extension of Interval Parsing Grammars (IPG; Zhang,
 Morrisett and Tan, PLDI 2023, [arXiv:2304.04859](https://arxiv.org/abs/2304.04859))
-needed for directory-based formats such as ZIP. The extension is verified
-in Verus and instantiated for a strict ZIP profile.
+needed for directory-based formats such as ZIP and Parquet. The extension
+is verified in Verus and instantiated for a strict ZIP profile and a strict
+Parquet profile; the Parquet footer goes through a verified canonical Thrift
+compact codec.
 
 ## Why
 
@@ -27,6 +29,7 @@ This crate keeps IPG's interval view and adds the missing pieces:
 | local structure | within a region, ordinary Vest combinators; a variable-length table is a plain `Vec<entry>` |
 | links | a format-specific check between a node and each node it jumped to (e.g. local header vs central entry) |
 | tiling ([`spec_tiled`](src/ranked.rs)) | in the format's layout order, regions are contiguous from 0 to the end of the input, and each region appears once |
+| sorted layout ([`spec_sorted_layout`](src/ranked.rs)) | for formats whose regions have no fixed order (Parquet's indexes and bloom filters): the layout is the regions sorted by offset |
 
 ## What is proven
 
@@ -48,25 +51,28 @@ Verus checks the following for every format that implements `RankedFormat`
   for `resolve`, `at`, `scan_back` and `check_tiled`. Memory safety and
   absence of panics come from Verus.
 
-For ZIP (`src/zip.rs`), the trait implementation is verified against its
-spec. [`lemma_zip_jumps_descend`](src/zip.rs) shows that ranks are a static
-property of the format: no parsed ZIP node ever jumps sideways or up, so the
+For ZIP (`src/zip.rs`) and Parquet (`src/parquet.rs`), the trait
+implementations are verified against their specs.
+[`lemma_zip_jumps_descend`](src/zip.rs) and
+[`lemma_parquet_jumps_descend`](src/parquet.rs) show that ranks are a static
+property of each format: no parsed node ever jumps sideways or up, so the
 driver's rank check never rejects. [`theorem_zip_non_malleable`](src/zip.rs)
-is the generic theorem specialized to ZIP.
+and [`theorem_parquet_non_malleable`](src/parquet.rs) are the generic
+theorem specialized to each format.
 
 The trusted base is Verus, z3 and vstd, plus vest_lib's combinator lemmas.
 `cargo verus focus` does not re-verify dependencies; `cargo verus verify`
 does.
 `spec_layout`, the order in which regions must tile, is a modelling choice of
-the format. Nothing proves that it matches what other ZIP readers expect.
+the format. Nothing proves that it matches what other readers expect.
 
 ```console
 $ ../scripts/setup-verus.sh          # Verus 0.2026.09.06.8dea4a2, z3 4.16.0, Rust 1.98.0
 $ cargo verus focus                  # in this directory
-verification results:: 200 verified, 0 errors
+verification results:: 338 verified, 0 errors
 ```
 
-The 200 include the generated region formats. Everything verifies at
+The 338 include the generated region formats. Everything verifies at
 Verus's default resource limit.
 
 ## The strict ZIP profile
@@ -119,6 +125,110 @@ The rejections are archives with data descriptors (most rejected jars, Go's
 `test-trailing-junk`, `test-badbase`, `test-baddirsz`, `comment-truncated`,
 and `readme.zip`, which has one byte after its comment).
 
+## Canonical Thrift compact
+
+[`src/thrift.rs`](src/thrift.rs) parses Thrift compact values from any
+position of a byte sequence, schema-less, into a tree of booleans, integers,
+doubles, binaries, lists and structs. It accepts one encoding per value:
+
+- minimal varints below 2^64; `i16`/`i32`/`i64` zigzag-decoded and in range;
+- a short field header exactly when the id delta is 1–15; field ids strictly
+  increase;
+- a short list header exactly when the size is below 15; list booleans are
+  the bytes 1 and 2;
+- no sets or maps; nesting at most 16 deep.
+
+The list element type is part of the value. Writers use 1 or 2 for lists of
+booleans, and fastparquet writes 0 for an empty list, so these choices do not
+create ambiguity.
+
+Proven: [`lemma_value_ps`](src/thrift.rs) shows that the serializer
+reproduces exactly what the parser consumed, so
+[`theorem_thrift_non_malleable`](src/thrift.rs) holds: two inputs that parse
+to the same struct consumed the same bytes. The executable parser
+(`parse_value`), field lookup (`get_field`) and value equality (`tval_eq`)
+are verified against the spec. The parser also proves that a parsed tree is
+no deeper than its depth budget; the Parquet copy check relies on that when
+it compares values parsed at different depths.
+
+## The strict Parquet profile
+
+| kind | rank | region | jumps |
+|---|---|---|---|
+| tail | 2 | the last 8 bytes: metadata length, `PAR1` | the FileMetaData before it, which it must fill |
+| FileMetaData | 1 | one Thrift struct | `PAR1` at 0; per column chunk: the chunk, its inline copy, column index, offset index, bloom filter |
+| head | 0 | `PAR1` | — |
+| column chunk | 0 | page header + page data, repeated to the end of the chunk | — |
+| inline copy | 0 | a Thrift struct at `file_offset` | — |
+| column index, offset index | 0 | a Thrift struct filling its interval | — |
+| bloom filter | 0 | a Thrift header, then `numBytes` of bitset | — |
+
+- **FileMetaData checks:**
+  - no encryption;
+  - no chunk in another file (`file_path`);
+  - offsets, sizes and counts are non-negative and of the right Thrift type;
+  - an index offset comes with its length;
+  - `num_rows` is the sum of the row groups' `num_rows`.
+- **Column chunk checks**, against values the FileMetaData passes down in
+  the jump (the kind carries them, like a parameterized nonterminal):
+  - a dictionary page comes first exactly when `dictionary_page_offset` is
+    set, and every other page is a data page (v1 or v2);
+  - `data_page_offset` is the first data page;
+  - the data pages' `num_values` sum to the chunk's `num_values`;
+  - headers plus uncompressed page sizes sum to `total_uncompressed_size`.
+- **Inline copies.** Older writers (Impala, parquet-cpp 1.x, parquet-rs 9)
+  put a copy of the ColumnChunk, or of its ColumnMetaData, after the chunk
+  and point `file_offset` at it. When `file_offset` is the end of the chunk,
+  the copy must be there and must equal the footer. That is the same
+  redundancy ZIP has between local and central headers.
+- **Layout:** all regions sorted by offset, which must tile the file.
+
+`scripts/make-parquet-fixtures.py` writes the fixtures in `tests/data/`.
+- **Accepted:**
+  - pyarrow 26 files: plain, snappy, v2 data pages, several row groups, no
+    dictionary, page index, bloom filter, and an empty table;
+  - DuckDB 2.0 (with bloom filters) and fastparquet 2026.9;
+  - a legacy layout with inline copies.
+- **Rejected:** files that each break one property. pyarrow reads all but
+  two of them:
+
+| fixture | pyarrow | rejected by |
+|---|---|---|
+| `bad-trailing-byte` | error | resolve: the tail is not `PAR1` |
+| `bad-no-head` (`PAR0` at 0) | reads | resolve: head |
+| `bad-num-rows`, `bad-num-values`, `bad-uncompressed-size`, `bad-data-page-offset` | reads | resolve: node checks |
+| `bad-inline-copy-mismatch` (copy's `num_values` differs from the footer) | reads | resolve: link |
+| `bad-nonminimal-varint`, `bad-long-field-header`, `bad-field-order` (same FileMetaData, another encoding) | reads | resolve: canonical Thrift |
+| `bad-gap-between-chunks` (3 bytes, offsets shifted) | reads | tiling |
+| `bad-overlapping-chunks` (two chunks at the same bytes) | error | tiling |
+| `bad-polars-unreferenced-copy` (written by Polars 2.1) | reads | tiling: see below |
+
+Polars writes a ColumnMetaData copy after every chunk, but sets `file_offset`
+to `data_page_offset + total_compressed_size`. For a chunk that starts with a
+dictionary page, that points past the copy, which is then not referenced from
+anywhere.
+
+On the [apache/parquet-testing](https://github.com/apache/parquet-testing)
+corpus (`examples/parquetcheck.rs`), the profile accepts 223 of 241 files.
+Rejected:
+
+- 6 of the 9 top-level `bad_data` files. The other three, and the
+  `bad_data/variants` files, are malformed inside page contents (levels,
+  dictionary values, variant encodings), which a layout profile does not
+  look at.
+- 5 files from parquet-mr 1.8–1.12 that write a dictionary page without
+  setting `dictionary_page_offset`, and point `data_page_offset` at it.
+- 2 files whose inline copy differs from the footer (parquet-rs 49 copies
+  the ColumnMetaData before it knows the bloom filter offsets).
+- `byte_array_decimal` (HVR): 25 unreferenced bytes after its chunk.
+- `dict-page-offset-zero`: `dictionary_page_offset` is 0.
+- `nation.dict-malformed`: pages overrun the chunk.
+- `repeated_no_annotation` (parquet-rs 0.3): `num_rows` is 0 but the row
+  group has 6 rows.
+
+A 235 MB pyarrow file with 2,000 column chunks and a page index checks in
+0.17 s.
+
 ## Relation to IPG
 
 | IPG | here |
@@ -142,7 +252,12 @@ and `readme.zip`, which has one byte after its comment).
   local-file region that extends past the data.
 - **Duplicate names** and other semantic checks from the ZipDiff study.
   These belong in `spec_node_ok` on the central directory.
-- **Parquet.** The footer is end-anchored (`PAR1` and a 4-byte length) and
-  `FileMetaData` points at column chunks, so the driver applies directly.
-  The missing piece is a Thrift-compact combinator with a canonical profile,
-  in the way PulseParse handles deterministic CBOR.
+- **Parquet.**
+  - Page contents (levels, encodings, compression) are not checked.
+  - Nor is the agreement between an offset index and the pages it lists.
+    That link runs between two siblings, while links here run from a
+    parent to its child.
+  - Encryption and `file_path` chunks are out of the profile.
+- **Thrift serialize-then-parse.** Only the parse-then-serialize direction
+  is proven. The other direction would give a verified writer for the
+  footer.

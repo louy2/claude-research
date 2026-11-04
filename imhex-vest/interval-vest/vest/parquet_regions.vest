@@ -1,0 +1,15 @@
+// The fixed-layout records of a Parquet file, for src/parquet.rs. The
+// FileMetaData and page headers are Thrift compact (src/thrift.rs).
+
+!LITTLE_ENDIAN
+
+// "PAR1" at the start of the file.
+head = {
+  const magic: [u8; 4] = [0x50, 0x41, 0x52, 0x31],
+}
+
+// The last 8 bytes: the length of the FileMetaData before them, then "PAR1".
+tail = {
+  metadata_len: u32,
+  const magic: [u8; 4] = [0x50, 0x41, 0x52, 0x31],
+}
