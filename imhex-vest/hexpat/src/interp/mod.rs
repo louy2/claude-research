@@ -167,6 +167,10 @@ struct Scope {
     union_start: u64,
     union_end: u64,
     bitfield: Option<Rc<RefCell<BitfieldState>>>,
+    /// The scope of a struct, union or bitfield instance. Name lookup does
+    /// not continue past it into the scopes of enclosing types (ImHex
+    /// reaches those only through `parent`), only to the global scope.
+    type_boundary: bool,
 }
 
 impl Scope {
@@ -182,6 +186,7 @@ impl Scope {
             union_start: 0,
             union_end: 0,
             bitfield: None,
+            type_boundary: false,
         }
     }
 }
@@ -448,7 +453,7 @@ impl Runtime {
             if let Some(v) = s.vars.get(name) {
                 return Some(v);
             }
-            if s.kind == ScopeKind::Function {
+            if s.kind == ScopeKind::Function || s.type_boundary {
                 break;
             }
         }
@@ -462,7 +467,7 @@ impl Runtime {
                 idx = Some(i);
                 break;
             }
-            if s.kind == ScopeKind::Function {
+            if s.kind == ScopeKind::Function || s.type_boundary {
                 break;
             }
         }
@@ -475,7 +480,7 @@ impl Runtime {
             if let Some(t) = s.template_types.get(name) {
                 return Some(t.clone());
             }
-            if s.kind == ScopeKind::Function {
+            if s.kind == ScopeKind::Function || s.type_boundary {
                 break;
             }
         }
@@ -1563,6 +1568,7 @@ impl Runtime {
         scope.this = Some(this);
         scope.parent = parent;
         scope.array_index = array_index;
+        scope.type_boundary = true;
         for (name, b) in &inst.bindings {
             match b {
                 Binding::Type(t) => {

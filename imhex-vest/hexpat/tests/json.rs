@@ -103,7 +103,7 @@ fn objects_arrays_strings_enums_and_pointers() {
         "sealed": "Inner sealed @ 0x7",
         "flags": {
             "x": 5,
-            "y": true
+            "y": 1
         },
         "formatted": "0xAB",
         "f": 1.5,

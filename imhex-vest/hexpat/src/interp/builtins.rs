@@ -417,11 +417,16 @@ pub fn register(rt: &mut Runtime) {
         let s = scalar(rt, arg(&args, 0, "length")?)?.as_str()?;
         Ok(Value::Unsigned(s.chars().count() as u128))
     });
+    // Strings hold one char per byte read (bytes above 0x7F become U+0080..U+00FF),
+    // so `at` counts characters like `length` and `substr` do.
     reg!(rt, "std::string::at", |rt, args| {
         let s = scalar(rt, arg(&args, 0, "at")?)?.as_str()?;
         let i = scalar(rt, arg(&args, 1, "at")?)?.as_u64()? as usize;
-        let b = s.as_bytes().get(i).copied().ok_or_else(|| Error::new("std::string::at: index out of range"))?;
-        Ok(Value::Char(b))
+        let c = s.chars().nth(i).ok_or_else(|| Error::new("std::string::at: index out of range"))?;
+        Ok(match u8::try_from(c as u32) {
+            Ok(b) => Value::Char(b),
+            Err(_) => Value::Str(c.to_string()),
+        })
     });
     reg!(rt, "std::string::substr", |rt, args| {
         let s = scalar(rt, arg(&args, 0, "substr")?)?.as_str()?;

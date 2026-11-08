@@ -343,3 +343,35 @@ fn every_integer_read_uses_vest_primitives() {
     assert_eq!(value(&rt, "s.e").as_i128().unwrap(), -1);
     assert_eq!(member(&rt, "s").borrow().size, 3 + 6 + 12 + 2 + 8);
 }
+
+#[test]
+fn names_do_not_leak_from_enclosing_types() {
+    // `type` inside Tag is Tag's own member, not Outer's template parameter
+    // (gvas.hexpat: StructPropertyValue<auto type, ...> -> Properties ->
+    // FPropertyTag, which declares `FString type` and reads `type.data`).
+    // ImHex 1.38.1 parses this; outer members are reachable only via `parent`.
+    let src = r#"
+        struct Str { u8 len; char data[len]; };
+        struct Tag { Str type; u8 k = type.len; };
+        struct Outer<auto type> { Tag tag; };
+        Outer<"x"> o @ 0;
+    "#;
+    let rt = run(src, &[2, b'h', b'i']);
+    assert_eq!(uint(&rt, "o.tag.type.len"), 2);
+}
+
+#[test]
+fn string_at_counts_characters_like_length() {
+    // A byte above 0x7F in a char array must not shift `std::string::at`
+    // against `length` and `substr`: the standard library's
+    // `std::string::replace` walks a string with all three.
+    let src = r#"
+        struct S { char data[2]; };
+        S s @ 0;
+        str r = std::format("{}", s.data);
+        std::assert(std::string::length(r) == 2, "length");
+        std::assert(std::string::at(r, 1) == 'A', "at");
+        std::assert(std::string::substr(r, 1, 1) == "A", "substr");
+    "#;
+    run(src, &[0xA7, b'A']);
+}

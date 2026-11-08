@@ -148,7 +148,11 @@ impl Writer {
             self.string_line(name, &s);
             return;
         }
+        // A `bool` bitfield field holds the unsigned value it was read as
+        // (`PatternBitfieldFieldBoolean::getValue`), so it prints as 0 or 1.
+        let bitfield_field = matches!(p.borrow().kind, PatternKind::BitfieldField { .. });
         let text = match rt.value_of(p) {
+            Ok(Value::Bool(b)) if bitfield_field => (b as u8).to_string(),
             Ok(v) => literal(rt, &v),
             Err(e) => format!("\"<error: {}>\"", json_escape(&e.message)),
         };

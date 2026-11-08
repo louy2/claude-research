@@ -11,8 +11,8 @@ A Rust toolchain for the [ImHex pattern language](https://docs.werwolv.net/patte
    whose byte-level decoding is done by [`vest_lib`](https://github.com/secure-foundations/vest)
    combinators (`U8`, `U16Le`, `U32Be`, `Pair`, `RepeatN`, `Varied`, …). It
    evaluates real-world patterns against binary files and produces an
-   ImHex-style pattern tree. On the corpus it evaluates 157 of the 178
-   patterns that ship with a test fixture (88%).
+   ImHex-style pattern tree. On the corpus it evaluates 159 of the 177
+   patterns that ship with a test fixture (90%).
 3. **`hexpat emit-vest`** – a translator from the *declarative* subset of
    hexpat to the **Vest DSL**. The Vest compiler then generates Rust parsers
    and serializers built on `vest_lib` that carry Verus proofs of memory
@@ -109,6 +109,14 @@ reference palette in creation order, which can differ from ImHex when
 patterns are created in a different order. The earlier structured dump
 (offsets and sizes on every node) is still available as `--tree-json`.
 
+Checked against ImHex 1.38.1 (the release flatpak's `imhex --pl format -f
+json`): for `gvas.hexpat` on its nine test saves, the two exports agree
+member for member. ImHex 1.38.1 percent-encodes string values (`%22…%22`);
+the current pattern language writes JSON escapes, as this export does.
+Strings are kept as one character per byte read, so a byte above 0x7F in
+a `char` array is the character U+0080–U+00FF here, where the reference
+keeps the raw byte.
+
 Without an include directory the interpreter provides native
 implementations of `std::mem`, `std::core`, `std::string`, `std::math`,
 `std::time`, `std::hash::crc32`, `std::print/format/assert/error/warning`
@@ -145,7 +153,7 @@ Fetch the corpus (`scripts/fetch-corpus.sh`) and run
 |---|---|
 | tree-sitter parse, no preprocessing | 286 / 287 files without `ERROR` nodes |
 | preprocess + lower to AST | all top-level patterns and includes |
-| interpret against the bundled fixture | 157 / 178 |
+| interpret against the bundled fixture | 159 / 177 |
 
 The remaining fixture failures are mostly patterns that read past the end
 of a fixture that the reference runtime tolerates differently, patterns
