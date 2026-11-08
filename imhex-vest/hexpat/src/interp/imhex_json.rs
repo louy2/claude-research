@@ -243,7 +243,51 @@ fn fmt_shortest(f: f64, single: bool) -> String {
         }
         return e;
     }
-    plain
+    tie_to_even(&plain, f, single)
+}
+
+/// Rust and fmtlib both print the shortest digits that read back as the
+/// same value, but when the value lies exactly halfway between two such
+/// candidates Rust rounds up and fmtlib to the even digit
+/// (`-630.00030517578125` prints as `-630.0003051757812` in fmtlib).
+fn tie_to_even(plain: &str, f: f64, single: bool) -> String {
+    let Some(last) = plain.chars().last().and_then(|c| c.to_digit(10)) else {
+        return plain.to_string();
+    };
+    if last % 2 == 0 || !plain.contains('.') {
+        return plain.to_string();
+    }
+    let head = &plain[..plain.len() - 1];
+    // The candidates around the odd last digit, and the midpoints between them.
+    let down = format!("{}{}", head, last - 1);
+    let mid_down = format!("{}{}5", head, last - 1);
+    let mid_up = format!("{}{}5", head, last);
+    let exact = exact_decimal(f, single);
+    let reads_back = |s: &str| {
+        if single {
+            s.parse::<f32>().ok() == Some(f as f32)
+        } else {
+            s.parse::<f64>().ok() == Some(f)
+        }
+    };
+    if exact == mid_down && reads_back(&down) {
+        return down;
+    }
+    if exact == mid_up && last < 9 {
+        let up = format!("{}{}", head, last + 1);
+        if reads_back(&up) {
+            return up;
+        }
+    }
+    plain.to_string()
+}
+
+/// The exact decimal expansion of a binary float, without trailing zeros.
+fn exact_decimal(f: f64, single: bool) -> String {
+    let v = if single { f as f32 as f64 } else { f };
+    let s = format!("{:.1100}", v);
+    let s = s.trim_end_matches('0');
+    s.strip_suffix('.').unwrap_or(s).to_string()
 }
 
 /// `hlp::encodeByteString`: printable bytes verbatim, C escapes otherwise.
@@ -266,13 +310,56 @@ pub fn encode_byte_string(bytes: &[u8]) -> String {
     out
 }
 
-/// The reference's JSON string escaping. Strings that came from raw bytes
-/// map invalid UTF-8 bytes to U+0080..U+00FF (see
-/// [`crate::lower::bytes_to_string`]); those are written as `\u00XX`, which
-/// is what the reference emits for an invalid byte.
+/// The reference's JSON string escaping (`FormatterJson::formatString`):
+/// valid UTF-8 sequences of the raw bytes are written as they are, each
+/// invalid byte as `\u00XX`.
+///
+/// [`crate::lower::bytes_to_string`] keeps raw bytes that are not valid
+/// UTF-8 as characters U+0000..U+00FF, so those characters are turned back
+/// into bytes here; wider characters stand for their UTF-8 encoding. A
+/// string decoded from valid UTF-8 whose characters are all below U+0100
+/// (`§` from `C2 A7`) cannot be told apart from raw bytes, and is escaped.
 pub fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
+    let mut bytes = Vec::with_capacity(s.len());
     for c in s.chars() {
+        match u8::try_from(c as u32) {
+            Ok(b) => bytes.push(b),
+            Err(_) => bytes.extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes()),
+        }
+    }
+    let mut out = String::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let ch = bytes[i];
+        let (len, mut cp) = match ch {
+            0x00..=0x7F => (1, ch as u32),
+            0xC2..=0xDF => (2, (ch & 0x1F) as u32),
+            0xE0..=0xEF => (3, (ch & 0x0F) as u32),
+            0xF0..=0xF4 => (4, (ch & 0x07) as u32),
+            _ => (0, 0),
+        };
+        let mut valid = len > 0 && i + len <= bytes.len();
+        for j in 1..len {
+            if !valid {
+                break;
+            }
+            let cb = bytes[i + j];
+            if cb & 0xC0 != 0x80 {
+                valid = false;
+            } else {
+                cp = (cp << 6) | (cb & 0x3F) as u32;
+            }
+        }
+        if valid {
+            valid = !((len == 2 && cp < 0x80) || (len == 3 && cp < 0x800) || (len == 4 && cp < 0x10000)
+                || (0xD800..=0xDFFF).contains(&cp) || cp > 0x10FFFF);
+        }
+        if !valid {
+            out.push_str(&format!("\\u{:04x}", ch));
+            i += 1;
+            continue;
+        }
+        let c = char::from_u32(cp).expect("validated code point");
         match c {
             '"' => out.push_str("\\\""),
             '\\' => out.push_str("\\\\"),
@@ -282,13 +369,13 @@ pub fn json_escape(s: &str) -> String {
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
             c if (c as u32) < 0x20 || c as u32 == 0x7F => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c if (0x80..0x100).contains(&(c as u32)) => out.push_str(&format!("\\u{:04x}", c as u32)),
             c if (c as u32) > 0xFFFF => {
                 let code = c as u32 - 0x10000;
                 out.push_str(&format!("\\u{:04x}\\u{:04x}", 0xD800 + ((code >> 10) & 0x3FF), 0xDC00 + (code & 0x3FF)));
             }
             c => out.push(c),
         }
+        i += len;
     }
     out
 }

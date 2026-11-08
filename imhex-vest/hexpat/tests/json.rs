@@ -134,3 +134,14 @@ fn metadata_lines() {
 }"##;
     assert_eq!(out.trim(), expected.trim());
 }
+
+#[test]
+fn float_ties_round_to_even() {
+    // -630.00030517578125 is exactly halfway between the two shortest
+    // candidates; fmtlib (and ImHex) print the even one.
+    let data = (-630.00030517578125f64).to_le_bytes();
+    let out = json("double d @ 0;", &data, false);
+    assert!(out.contains("\"d\": -630.0003051757812"), "{}", out);
+    let out = json("double d @ 0;", &1.5f64.to_le_bytes(), false);
+    assert!(out.contains("\"d\": 1.5"), "{}", out);
+}
