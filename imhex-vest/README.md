@@ -68,7 +68,8 @@ formats/*.hexpat ──tree-sitter──▶ AST ──interpreter (vest_lib prim
 | `formats/` | CC0 patterns for popular formats (declarative subset) |
 | `vest-formats/` | generated `.vest` + generated verified Rust + end-to-end tests |
 | `interval-vest/` | `At`, backward scan and ranked-jump driver (`src/ranked.rs`), canonical Thrift compact (`src/thrift.rs`), strict ZIP and Parquet profiles (`src/zip.rs`, `src/parquet.rs`, `vest/*.vest`), fixtures |
-| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-verus.sh`, `verify-vest.sh`, `make-zip-fixtures.py`, `make-parquet-fixtures.py`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
+| `scripts/` | `fetch-corpus.sh`, `regen-formats.sh`, `setup-verus.sh`, `verify-vest.sh`, `make-zip-fixtures.py`, `make-parquet-fixtures.py`, `compare-imhex.py`, `setup-asn1-tools.sh`, `regen-asn1.sh`, `verify-asn1.sh` |
+| `TODO.md` | open items: interpreter differences from ImHex, upstream reports, interval-vest next steps |
 
 ## Usage
 
