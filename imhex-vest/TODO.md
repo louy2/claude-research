@@ -113,8 +113,8 @@ First differing line, ImHex nightly vs hexpat:
 
 ### Termination
 
-Done: every evaluation stops at a limit; the measure checks stop a run
-where it goes wrong (`Limits`, `hexpat/tests/termination.rs`); the static
+Done: every evaluation stops at a limit, which the ImHex limit pragmas can
+raise up to a cap; the measure checks stop a run where it goes wrong (`Limits`, `hexpat/tests/termination.rs`); the static
 check gives a verdict per loop, array and cycle (`hexpat termination`,
 `hexpat/src/termination.rs`, `scripts/termination-sweep.py`,
 `scripts/termination-fuzz.py`). On the 243 corpus patterns: 190 fully
@@ -123,10 +123,13 @@ proven, 24 more decided by run-time checks, 29 with something not proven
 
 Open:
 
-- [ ] `#pragma eval_depth`, `array_limit`, `pattern_limit` and `loop_limit`
-  are ignored. ImHex's defaults are lower than ours (depth 32, arrays
-  0x10000, patterns 0x100000, loops 0x1000), and `0` turns a limit off
-  there. Decide whether a pragma may raise our limits, and up to where.
+- [ ] The limit pragmas only raise a limit, up to a cap. ImHex also lets
+  a pattern lower one and switch one off with `0`. If exact ImHex limit
+  errors are ever wanted (for the JSON comparison), the counts have to
+  match ImHex's first: it counts scopes for the depth and applies the
+  array limit before reading.
+- [ ] The command line has no flags for the limits or the caps; only a
+  pragma or the library API changes them.
 - [ ] Memory is bounded only loosely: built strings stop at 64 MiB each
   and heap sections at 16 MiB each, but nothing bounds how many are alive.
 - [ ] The depth limit of 256 needs about 8 MiB of stack in a debug build
@@ -170,9 +173,6 @@ Open:
   deep took 18 s for 1 million steps, because every name lookup rebuilt
   its candidate list once per enclosing scope. That is fixed (2.2 s); the
   time still grows faster than the input, so other per-scope costs remain.
-- [ ] Reaching the step limit can take minutes: 100 million steps took
-  175 s in a loop that calls a library function each round. The heaviest
-  corpus fixture needs 1.3 million steps; consider a lower default.
 - [ ] The depth limit counts type nesting and function calls together, so
   an input nested close to 256 deep fails in whatever function is called
   there (`recursion limit reached calling read_unsigned`). The measure

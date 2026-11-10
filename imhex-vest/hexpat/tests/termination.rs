@@ -303,3 +303,90 @@ fn loop_counters_do_not_wrap() {
     // A counter the condition does not read is not watched.
     run_ok("u32 t = 0; for (u8 i = 250, t < 10, i += 1) { t += 1; }", vec![0; 4]);
 }
+
+// ---------------------------------------------------------------------------
+// Limit pragmas: `eval_depth`, `array_limit`, `pattern_limit`, `loop_limit`.
+
+/// The limits after loading `src` with the given starting limits and caps.
+fn limits_after(src: &'static str, tune: fn(&mut Runtime)) -> hexpat::interp::Limits {
+    on_big_stack(move || {
+        let mut rt = Runtime::new(vec![0; 4]);
+        tune(&mut rt);
+        rt.run_source(src, None).unwrap_or_else(|e| panic!("{}\n{}", e, src));
+        rt.limits.clone()
+    })
+}
+
+#[test]
+fn a_pragma_raises_a_limit() {
+    let l = limits_after("#pragma loop_limit 20000000\n#pragma array_limit 0x200000\n#pragma pattern_limit 5000000\nu8 a @ 0;", checked);
+    assert_eq!(l.max_loop_iterations, 20_000_000);
+    assert_eq!(l.max_array_entries, 0x200000);
+    assert_eq!(l.max_patterns, 5_000_000);
+    // The step limit follows: ten steps per pattern, two per loop round.
+    assert_eq!(l.max_steps, 50_000_000);
+
+    // A loop of 3000 rounds under a limit of 1000.
+    let src = "#pragma loop_limit 5000\nu32 i = 0; while (i < 3000) { i = i + 1; }";
+    let low = |rt: &mut Runtime| rt.limits.max_loop_iterations = 1000;
+    assert_eq!(limits_after(src, low).max_loop_iterations, 5000);
+    assert_stops("u32 i = 0; while (i < 3000) { i = i + 1; }", low, "while loop exceeded the iteration limit (1000; `#pragma loop_limit` raises it, up to 100000000)");
+
+    // An array of 3000 entries under a limit of 1000.
+    on_big_stack(|| {
+        let src = "#pragma array_limit 5000\nstruct E { u8 a; }; E es[while(!std::mem::eof())] @ 0;";
+        let mut rt = Runtime::new(vec![0; 3000]);
+        rt.limits.max_array_entries = 1000;
+        rt.run_source(src, None).unwrap();
+        let mut rt = Runtime::new(vec![0; 3000]);
+        rt.limits.max_array_entries = 1000;
+        let e = rt.run_source("struct E { u8 a; }; E es[while(!std::mem::eof())] @ 0;", None).unwrap_err().to_string();
+        assert!(e.contains("array entry limit exceeded (1000; `#pragma array_limit` raises it, up to 32000000)"), "{}", e);
+    });
+}
+
+#[test]
+fn a_pragma_never_lowers_a_limit_and_never_passes_the_cap() {
+    let d = hexpat::interp::Limits::default();
+    let caps = hexpat::interp::Limits::pragma_caps();
+    // Lower than the default: ignored.
+    let l = limits_after("#pragma loop_limit 5\n#pragma pattern_limit 100\n#pragma array_limit 1\n#pragma eval_depth 2\nu8 a @ 0;", checked);
+    assert_eq!(
+        (l.max_loop_iterations, l.max_patterns, l.max_array_entries, l.max_recursion, l.max_steps),
+        (d.max_loop_iterations, d.max_patterns, d.max_array_entries, d.max_recursion, d.max_steps)
+    );
+    // 0 means "no limit" in ImHex, and patterns ask for huge values: both
+    // give the cap, so every limit stays finite.
+    let l = limits_after("#pragma pattern_limit 0\n#pragma array_limit 0x1fffffff\n#pragma loop_limit 4294967296\nu8 a @ 0;", checked);
+    assert_eq!((l.max_patterns, l.max_array_entries, l.max_loop_iterations), (caps.max_patterns, caps.max_array_entries, caps.max_loop_iterations));
+    assert_eq!(l.max_steps, caps.max_steps);
+    // An embedder can narrow the caps.
+    let l = limits_after("#pragma pattern_limit 0\nu8 a @ 0;", |rt| rt.limit_caps.max_patterns = 3_000_000);
+    assert_eq!(l.max_patterns, 3_000_000);
+    assert_stops("#pragma loop_limit many\nu8 a @ 0;", checked, "invalid limit in pragma loop_limit");
+}
+
+#[test]
+fn eval_depth_is_capped_by_the_embedder() {
+    // A chain of 400 nested nodes, one byte each.
+    let src = "#pragma eval_depth 1000\nstruct N { u8 more; if (more != 0) N next; }; N n @ 0;";
+    let data = || {
+        let mut d = vec![1u8; 400];
+        d.push(0);
+        d
+    };
+    // By default the cap is the default depth: the pragma changes nothing.
+    on_big_stack(move || {
+        let mut rt = Runtime::new(data());
+        let e = rt.run_source(src, None).unwrap_err().to_string();
+        assert!(e.contains("recursion limit reached creating `N` (256)"), "{}", e);
+        assert_eq!(rt.limits.max_recursion, 256);
+    });
+    // A caller that runs on a large stack can allow more.
+    on_big_stack(move || {
+        let mut rt = Runtime::new(data());
+        rt.limit_caps.max_recursion = 2000;
+        rt.run_source(src, None).unwrap();
+        assert_eq!(rt.limits.max_recursion, 1000);
+    });
+}

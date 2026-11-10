@@ -187,6 +187,10 @@ fn cmd_termination(args: &Args) -> ExitCode {
     }
 }
 
+/// The deepest nesting `#pragma eval_depth` can ask for on the command
+/// line. A level needs up to about 32 KiB of stack in a debug build.
+const CLI_MAX_DEPTH: usize = 4096;
+
 fn read_pattern(path: &Path) -> Result<String, ExitCode> {
     std::fs::read_to_string(path).map_err(|e| {
         eprintln!("cannot read {}: {}", path.display(), e);
@@ -256,6 +260,9 @@ fn cmd_run(args: &Args) -> ExitCode {
     };
     let mut rt = Runtime::new(data);
     rt.limits.check_measures = !args.no_measure_checks;
+    // This thread has a large stack (see `main`), so `#pragma eval_depth`
+    // may ask for deeper nesting than a library caller gets.
+    rt.limit_caps.max_recursion = CLI_MAX_DEPTH;
     for inc in &args.includes {
         rt.add_include_path(inc);
     }
@@ -272,7 +279,7 @@ fn cmd_run(args: &Args) -> ExitCode {
     }
     let result = rt.run_source(&source, path.parent());
     if std::env::var_os("HEXPAT_STATS").is_some() {
-        eprintln!("[stats] steps={}", rt.steps());
+        eprintln!("[stats] steps={} patterns={}", rt.steps(), rt.pattern_count());
     }
     let opts = DumpOptions { formatted: args.format, show_hidden: args.hidden, max_entries: args.max_entries };
     for line in &rt.console {
@@ -327,6 +334,9 @@ fn cmd_format(args: &Args) -> ExitCode {
     };
     let mut rt = Runtime::new(data);
     rt.limits.check_measures = !args.no_measure_checks;
+    // This thread has a large stack (see `main`), so `#pragma eval_depth`
+    // may ask for deeper nesting than a library caller gets.
+    rt.limit_caps.max_recursion = CLI_MAX_DEPTH;
     for inc in &args.includes {
         rt.add_include_path(inc);
     }

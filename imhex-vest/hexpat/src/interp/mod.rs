@@ -285,11 +285,60 @@ impl Default for Limits {
         Limits {
             max_patterns: 2_000_000,
             max_array_entries: 1_000_000,
-            max_loop_iterations: 50_000_000,
+            max_loop_iterations: 10_000_000,
             max_recursion: 256,
-            max_steps: 100_000_000,
+            max_steps: 20_000_000,
             check_measures: true,
         }
+    }
+}
+
+impl Limits {
+    /// The most a `#pragma` in a pattern may raise each limit to (see
+    /// [`Runtime::limit_caps`]). Every cap is finite, so a pattern cannot
+    /// switch a limit off. The recursion cap equals the default: how deep
+    /// evaluation may nest depends on the stack of the thread that runs
+    /// it, which only the embedder knows.
+    pub fn pragma_caps() -> Self {
+        Limits {
+            max_patterns: 32_000_000,
+            max_array_entries: 32_000_000,
+            max_loop_iterations: 100_000_000,
+            max_recursion: 256,
+            max_steps: Self::STEPS_PER_PATTERN * 32_000_000,
+            check_measures: true,
+        }
+    }
+
+    /// When a pragma raises the pattern limit, the step limit follows at
+    /// this rate. The corpus fixtures with many patterns run 3 to 8 steps
+    /// per pattern.
+    const STEPS_PER_PATTERN: u64 = 10;
+
+    /// After a pragma raised a limit: enough steps to reach the pattern and
+    /// loop limits, within the cap.
+    fn raise_steps(&mut self, caps: &Limits) {
+        let wanted = self.max_patterns.saturating_mul(Self::STEPS_PER_PATTERN).max(self.max_loop_iterations.saturating_mul(2));
+        self.max_steps = self.max_steps.max(wanted.min(caps.max_steps));
+    }
+}
+
+/// The value of a limit pragma: a number, where 0 asks for no limit.
+fn parse_limit(value: &str) -> Option<u64> {
+    let n = match crate::lower::parse_number(value.trim()).ok()? {
+        Literal::Unsigned(n) => u64::try_from(n).unwrap_or(u64::MAX),
+        Literal::Signed(n) => u64::try_from(n).ok()?,
+        _ => return None,
+    };
+    Some(if n == 0 { u64::MAX } else { n })
+}
+
+/// The tail of a limit error: the limit, and the pragma that raises it.
+fn limit_hint(current: u64, cap: u64, pragma: &str) -> String {
+    if cap > current {
+        format!(" ({}; `#pragma {}` raises it, up to {})", current, pragma, cap)
+    } else {
+        format!(" ({})", current)
     }
 }
 
@@ -317,6 +366,11 @@ pub struct Runtime {
     dry_run: usize,
     pattern_count: u64,
     pub limits: Limits,
+    /// The most that `#pragma eval_depth`, `array_limit`, `pattern_limit`
+    /// and `loop_limit` may raise the limits to. A pragma never lowers a
+    /// limit, and asking for more than the cap (or for 0, which means "no
+    /// limit" in ImHex) gives the cap.
+    pub limit_caps: Limits,
     env_vars: HashMap<String, Value>,
     in_vars: HashMap<String, Value>,
     pub out_vars: HashMap<String, Value>,
@@ -363,6 +417,7 @@ impl Runtime {
             dry_run: 0,
             pattern_count: 0,
             limits: Limits::default(),
+            limit_caps: Limits::pragma_caps(),
             env_vars: HashMap::new(),
             in_vars: HashMap::new(),
             out_vars: HashMap::new(),
@@ -459,6 +514,22 @@ impl Runtime {
             }
             "base_address" => {
                 // Not modelled: the data always starts at address 0.
+            }
+            "eval_depth" | "array_limit" | "pattern_limit" | "loop_limit" => {
+                let asked = parse_limit(value).ok_or_else(|| Error::new(format!("invalid limit in pragma {}: {}", name, value.trim())))?;
+                // Raise only, and only up to the cap: the defaults here are
+                // above ImHex's, and every limit stays finite.
+                let caps = self.limit_caps.clone();
+                let raise = |current: u64, cap: u64| current.max(asked.min(cap));
+                match name {
+                    "eval_depth" => {
+                        self.limits.max_recursion = raise(self.limits.max_recursion as u64, caps.max_recursion as u64) as usize;
+                    }
+                    "array_limit" => self.limits.max_array_entries = raise(self.limits.max_array_entries, caps.max_array_entries),
+                    "pattern_limit" => self.limits.max_patterns = raise(self.limits.max_patterns, caps.max_patterns),
+                    _ => self.limits.max_loop_iterations = raise(self.limits.max_loop_iterations, caps.max_loop_iterations),
+                }
+                self.limits.raise_steps(&caps);
             }
             _ => {}
         }
@@ -771,7 +842,7 @@ impl Runtime {
                 self.scopes.push(scope);
                 // `using A = B; using B = A;` would resolve forever.
                 let r = if self.depth >= self.limits.max_recursion {
-                    Err(Error::new(format!("recursion limit reached resolving alias `{}`", decl.full_name)))
+                    Err(Error::new(format!("recursion limit reached resolving alias `{}`{}", decl.full_name, self.depth_hint())))
                 } else {
                     self.depth += 1;
                     let r = self.instantiate(target);
@@ -927,7 +998,7 @@ impl Runtime {
     fn exec_stmt(&mut self, stmt: &Stmt) -> Result<Flow> {
         self.steps += 1;
         if self.out_of_steps() {
-            return Err(Error::new("step limit exceeded"));
+            return Err(self.step_limit_error());
         }
         if self.trace {
             eprintln!("[trace] {:>7}ms {:indent$}line {}", self.started.elapsed().as_millis(), "", stmt.line(), indent = self.scopes.len());
@@ -1020,7 +1091,7 @@ impl Runtime {
                 while self.eval(cond)?.as_bool()? {
                     iterations += 1;
                     if iterations > self.limits.max_loop_iterations {
-                        return Err(Error::new("while loop exceeded the iteration limit"));
+                        return Err(self.loop_limit_error("while"));
                     }
                     let before = self.counter_values(&counters);
                     match self.exec_stmts(body)? {
@@ -1038,7 +1109,7 @@ impl Runtime {
                 while self.eval(cond)?.as_bool()? {
                     iterations += 1;
                     if iterations > self.limits.max_loop_iterations {
-                        return Err(Error::new("for loop exceeded the iteration limit"));
+                        return Err(self.loop_limit_error("for"));
                     }
                     let before = self.counter_values(&counters);
                     match self.exec_stmts(body)? {
@@ -1547,6 +1618,37 @@ impl Runtime {
     // Pattern creation
     // ------------------------------------------------------------------
 
+    fn step_limit_error(&self) -> Error {
+        Error::new(format!(
+            "step limit exceeded ({} statements and patterns; it follows `#pragma pattern_limit` and `loop_limit`, up to {})",
+            self.limits.max_steps, self.limit_caps.max_steps
+        ))
+    }
+
+    fn array_limit_error(&self) -> Error {
+        Error::new(format!(
+            "array entry limit exceeded{}",
+            limit_hint(self.limits.max_array_entries, self.limit_caps.max_array_entries, "array_limit")
+        ))
+    }
+
+    fn loop_limit_error(&self, kind: &str) -> Error {
+        Error::new(format!(
+            "{} loop exceeded the iteration limit{}",
+            kind,
+            limit_hint(self.limits.max_loop_iterations, self.limit_caps.max_loop_iterations, "loop_limit")
+        ))
+    }
+
+    fn depth_hint(&self) -> String {
+        limit_hint(self.limits.max_recursion as u64, self.limit_caps.max_recursion as u64, "eval_depth")
+    }
+
+    /// Patterns created so far.
+    pub fn pattern_count(&self) -> u64 {
+        self.pattern_count
+    }
+
     /// Statements executed and patterns created so far (see
     /// [`Limits::max_steps`]).
     pub fn steps(&self) -> u64 {
@@ -1558,11 +1660,14 @@ impl Runtime {
         // only grows.
         self.steps += 1;
         if self.out_of_steps() {
-            return Err(Error::new("step limit exceeded"));
+            return Err(self.step_limit_error());
         }
         self.pattern_count += 1;
         if self.pattern_count > self.limits.max_patterns {
-            return Err(Error::new("pattern limit exceeded"));
+            return Err(Error::new(format!(
+                "pattern limit exceeded{}",
+                limit_hint(self.limits.max_patterns, self.limit_caps.max_patterns, "pattern_limit")
+            )));
         }
         Ok(())
     }
@@ -1617,7 +1722,7 @@ impl Runtime {
                 // A type that contains, points to or places itself nests one
                 // level per instance; the depth limit is what stops a cycle.
                 if self.depth >= self.limits.max_recursion {
-                    return Err(Error::new(format!("recursion limit reached creating `{}`", inst.display)));
+                    return Err(Error::new(format!("recursion limit reached creating `{}`{}", inst.display, self.depth_hint())));
                 }
                 let tracked = self.limits.check_measures && !matches!(decl.kind, TypeKind::Enum(_));
                 if tracked {
@@ -1902,7 +2007,7 @@ impl Runtime {
             }
             // `struct A : A` would inherit forever.
             if self.depth >= self.limits.max_recursion {
-                return Err(Error::new(format!("recursion limit reached inheriting from `{}`", pdecl.full_name)));
+                return Err(Error::new(format!("recursion limit reached inheriting from `{}`{}", pdecl.full_name, self.depth_hint())));
             }
             let saved_ns = std::mem::replace(&mut self.scope_mut().namespace, pdecl.namespace.clone());
             self.depth += 1;
@@ -2106,7 +2211,7 @@ impl Runtime {
                             break;
                         }
                         if count >= self.limits.max_array_entries {
-                            return Err(Error::new("array entry limit exceeded"));
+                            return Err(self.array_limit_error());
                         }
                         self.check_bounds(section, self.cursor, es)?;
                         self.cursor += es;
@@ -2157,7 +2262,7 @@ impl Runtime {
                 }
             }
             if index >= limit {
-                return Err(Error::new("array entry limit exceeded"));
+                return Err(self.array_limit_error());
             }
             self.push_scope(self.scope().kind);
             self.scope_mut().array_index = Some(index);
@@ -2690,7 +2795,7 @@ impl Runtime {
 
     fn call_user_function(&mut self, f: &Rc<FunctionDef>, args: Vec<Value>) -> Result<Value> {
         if self.depth >= self.limits.max_recursion {
-            return Err(Error::new(format!("recursion limit reached calling `{}`", f.name)));
+            return Err(Error::new(format!("recursion limit reached calling `{}`{}", f.name, self.depth_hint())));
         }
         let min_args = f.params.iter().filter(|p| p.default.is_none()).count();
         if args.len() < min_args || (f.pack.is_none() && args.len() > f.params.len()) {

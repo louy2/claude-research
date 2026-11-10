@@ -93,12 +93,30 @@ $ target/release/hexpat parse pattern.hexpat                            # syntax
 for `in` variables, `--hidden`, `--max-entries N`, and `HEXPAT_TRACE=1`
 prints every statement and pattern creation.
 
-Every evaluation stops. `Limits` (`hexpat/src/interp/mod.rs`) bounds the
-nesting of types and function calls (256), the statements executed plus
-patterns created (100 million), patterns (2 million), array entries
-(1 million) and iterations of one loop (50 million); a pattern that would
-run forever ends with an error instead. `HEXPAT_STATS=1` prints the step
-count of a run; the heaviest corpus fixture uses 1.3 million.
+Every evaluation stops. `Limits` (`hexpat/src/interp/mod.rs`) bounds an
+evaluation; a pattern that would run forever ends with an error instead.
+
+| limit | default | `#pragma` | cap for the pragma |
+|---|---|---|---|
+| patterns created | 2 million | `pattern_limit` | 32 million |
+| entries of one array | 1 million | `array_limit` | 32 million |
+| rounds of one loop | 10 million | `loop_limit` | 100 million |
+| nesting of types and function calls | 256 | `eval_depth` | 256 in the library, 4096 on the command line |
+| statements executed plus patterns created | 20 million | follows the others | 320 million |
+
+The four ImHex pragmas raise a limit, up to the cap. They never lower one,
+because the defaults here are already above ImHex's (1,048,576 patterns,
+65,536 entries, 4,096 rounds, depth 32). Asking for more than the cap, or
+for `0`, which switches a limit off in ImHex, gives the cap: every limit
+stays finite. When a pragma raises the pattern or loop limit, the step
+limit follows (ten steps per pattern, two per loop round). An embedder sets
+the caps in `Runtime::limit_caps`; the depth cap is the default depth
+unless the caller says its stack can take more, as the command line does.
+
+`HEXPAT_STATS=1` prints the steps and patterns of a run. The heaviest corpus
+fixture uses 1.3 million steps and 0.5 million patterns, and fixtures with
+many patterns run 3 to 8 steps per pattern. Reaching the default step limit
+takes between a few seconds and about half a minute.
 
 Before a limit is reached, the **measure checks** (`Limits::check_measures`,
 on by default) stop a run where it goes wrong:
