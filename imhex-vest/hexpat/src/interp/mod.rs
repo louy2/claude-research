@@ -1644,6 +1644,11 @@ impl Runtime {
         limit_hint(self.limits.max_recursion as u64, self.limit_caps.max_recursion as u64, "eval_depth")
     }
 
+    /// The length of the data being evaluated.
+    pub fn data_len(&self) -> u64 {
+        self.section_len(0)
+    }
+
     /// Patterns created so far.
     pub fn pattern_count(&self) -> u64 {
         self.pattern_count

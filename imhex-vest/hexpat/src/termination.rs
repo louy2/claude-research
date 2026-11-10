@@ -111,6 +111,17 @@ impl Report {
 /// Analyses the pattern in `source`. `path` names it in the report and
 /// gives the directory for relative includes.
 pub fn analyze(source: &str, path: &Path, include_paths: &[PathBuf]) -> Result<Report> {
+    Ok(An::load(source, path, include_paths)?.run())
+}
+
+impl An {
+    /// Loads a pattern and everything it imports, without analysing it.
+    pub(crate) fn load(source: &str, path: &Path, include_paths: &[PathBuf]) -> Result<An> {
+        load_model(source, path, include_paths)
+    }
+}
+
+fn load_model(source: &str, path: &Path, include_paths: &[PathBuf]) -> Result<An> {
     let mut rt = Runtime::new(Vec::new());
     for p in include_paths {
         rt.add_include_path(p);
@@ -124,14 +135,15 @@ pub fn analyze(source: &str, path: &Path, include_paths: &[PathBuf]) -> Result<R
     an.collect(&prelude.statements, f, &[], false)?;
     let program = an.rt.load(source, path.parent())?;
     let f = an.file(path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
+    an.root_file = f;
     an.collect(&program.statements, f, &[], true)?;
-    Ok(an.run())
+    Ok(an)
 }
 
 // ---------------------------------------------------------------------------
 // Declarations and the graph
 
-enum TKind {
+pub(crate) enum TKind {
     Struct(Rc<StructDef>),
     Union(Rc<StructDef>),
     Bitfield(Rc<StructDef>),
@@ -140,30 +152,30 @@ enum TKind {
     Forward,
 }
 
-struct TypeDecl {
-    full: String,
-    ns: Vec<String>,
-    file: usize,
-    line: u32,
-    params: Vec<TemplateParam>,
-    kind: TKind,
+pub(crate) struct TypeDecl {
+    pub(crate) full: String,
+    pub(crate) ns: Vec<String>,
+    pub(crate) file: usize,
+    pub(crate) line: u32,
+    pub(crate) params: Vec<TemplateParam>,
+    pub(crate) kind: TKind,
 }
 
-struct FuncDecl {
-    full: String,
-    ns: Vec<String>,
-    file: usize,
-    def: Rc<FunctionDef>,
+pub(crate) struct FuncDecl {
+    pub(crate) full: String,
+    pub(crate) ns: Vec<String>,
+    pub(crate) file: usize,
+    pub(crate) def: Rc<FunctionDef>,
 }
 
-struct MainStmt {
-    file: usize,
-    ns: Vec<String>,
-    stmt: Stmt,
+pub(crate) struct MainStmt {
+    pub(crate) file: usize,
+    pub(crate) ns: Vec<String>,
+    pub(crate) stmt: Stmt,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum EdgeKind {
+pub(crate) enum EdgeKind {
     /// Instantiated at the cursor. `progress`: at least one byte of the
     /// source type has been read before.
     Inline { progress: bool },
@@ -176,10 +188,13 @@ enum EdgeKind {
     /// A parent type or the target of an alias: resolved, and (for a
     /// parent) run in the body of the type that names it.
     Resolve,
+    /// Named without being evaluated (`E::A` names the enum `E`). Counts
+    /// for what is reachable, not for cycles.
+    Use,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum CtxKind {
+pub(crate) enum CtxKind {
     Struct,
     Union,
     Bitfield,
@@ -190,12 +205,12 @@ enum CtxKind {
 }
 
 #[derive(Clone)]
-struct Ctx {
-    node: usize,
-    ns: Vec<String>,
-    params: Vec<TemplateParam>,
-    kind: CtxKind,
-    file: usize,
+pub(crate) struct Ctx {
+    pub(crate) node: usize,
+    pub(crate) ns: Vec<String>,
+    pub(crate) params: Vec<TemplateParam>,
+    pub(crate) kind: CtxKind,
+    pub(crate) file: usize,
 }
 
 impl Ctx {
@@ -205,7 +220,7 @@ impl Ctx {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Phase {
+pub(crate) enum Phase {
     /// Only compute sizes.
     Min,
     /// Record edges and local effects.
@@ -216,16 +231,16 @@ enum Phase {
 
 /// Bits consumed by a statement list, as lower bounds. `None`: no path.
 #[derive(Clone, Copy, Default)]
-struct Flow {
+pub(crate) struct Flow {
     /// Paths that reach the end.
-    end: Option<u64>,
+    pub(crate) end: Option<u64>,
     /// Paths that leave through `continue` or `return`.
-    exit: Option<u64>,
+    pub(crate) exit: Option<u64>,
     /// Something in the list may move the cursor back.
-    rewind: bool,
+    pub(crate) rewind: bool,
 }
 
-fn min_opt(a: Option<u64>, b: Option<u64>) -> Option<u64> {
+pub(crate) fn min_opt(a: Option<u64>, b: Option<u64>) -> Option<u64> {
     match (a, b) {
         (Some(x), Some(y)) => Some(x.min(y)),
         (x, None) | (None, x) => x,
@@ -248,7 +263,7 @@ fn advance(cx: &Ctx, a: Option<u64>, b: Option<u64>) -> Option<u64> {
 
 /// What a template type parameter is bound to at one instantiation.
 #[derive(Clone, Copy)]
-enum ArgTy {
+pub(crate) enum ArgTy {
     Type(usize),
     /// A builtin type of this many bits.
     Builtin(u64),
@@ -256,45 +271,49 @@ enum ArgTy {
     Unknown,
 }
 
-enum FuncRef {
+pub(crate) enum FuncRef {
     User(usize),
     Builtin(String),
     Unknown,
 }
 
-struct An {
-    rt: Runtime,
-    files: Vec<String>,
-    imported: HashSet<String>,
-    aliases: HashMap<String, Vec<String>>,
-    types: Vec<TypeDecl>,
-    type_ix: HashMap<String, usize>,
-    funcs: Vec<FuncDecl>,
-    func_ix: HashMap<String, usize>,
-    main: Vec<MainStmt>,
-    edges: Vec<Vec<(usize, EdgeKind)>>,
+pub(crate) struct An {
+    pub(crate) rt: Runtime,
+    pub(crate) files: Vec<String>,
+    pub(crate) imported: HashSet<String>,
+    pub(crate) aliases: HashMap<String, Vec<String>>,
+    pub(crate) types: Vec<TypeDecl>,
+    pub(crate) type_ix: HashMap<String, usize>,
+    pub(crate) funcs: Vec<FuncDecl>,
+    pub(crate) func_ix: HashMap<String, usize>,
+    pub(crate) main: Vec<MainStmt>,
+    pub(crate) edges: Vec<Vec<(usize, EdgeKind)>>,
     /// How a template type parameter (type, index) is used in its own body.
-    param_use: HashMap<(usize, usize), Vec<EdgeKind>>,
+    pub(crate) param_use: HashMap<(usize, usize), Vec<EdgeKind>>,
     /// Parameters passed on to another template.
-    forwards: HashMap<(usize, usize), Vec<(usize, usize)>>,
+    pub(crate) forwards: HashMap<(usize, usize), Vec<(usize, usize)>>,
     /// (template, parameter index, argument type) for every instantiation.
-    arg_edges: Vec<(usize, usize, ArgTy)>,
+    pub(crate) arg_edges: Vec<(usize, usize, ArgTy)>,
     /// (user, template): the user computes a value argument of the template.
-    computed_args: HashSet<(usize, usize)>,
+    pub(crate) computed_args: HashSet<(usize, usize)>,
     /// Every type a template type parameter is bound to, after `run`.
-    param_args: HashMap<(usize, usize), Vec<ArgTy>>,
-    rewind_local: Vec<bool>,
-    wnl_local: Vec<bool>,
-    rewind: Vec<bool>,
-    wnl: Vec<bool>,
-    min_memo: HashMap<usize, Flow>,
-    min_stack: Vec<usize>,
+    pub(crate) param_args: HashMap<(usize, usize), Vec<ArgTy>>,
+    pub(crate) rewind_local: Vec<bool>,
+    pub(crate) wnl_local: Vec<bool>,
+    pub(crate) rewind: Vec<bool>,
+    pub(crate) wnl: Vec<bool>,
+    pub(crate) min_memo: HashMap<usize, Flow>,
+    pub(crate) min_stack: Vec<usize>,
     /// The lowest stack position whose placeholder the current computation used.
-    min_low: usize,
-    pure_memo: HashMap<usize, bool>,
+    pub(crate) min_low: usize,
+    pub(crate) pure_memo: HashMap<usize, bool>,
     /// (node the note is about, text); `usize::MAX` for the whole pattern.
-    notes: BTreeSet<(usize, String)>,
-    obligations: Vec<Obligation>,
+    pub(crate) notes: BTreeSet<(usize, String)>,
+    /// The file of the pattern itself (not of an import or the prelude).
+    pub(crate) root_file: usize,
+    /// Nodes reachable from the top level, after `run`.
+    pub(crate) reachable: Vec<bool>,
+    pub(crate) obligations: Vec<Obligation>,
 }
 
 impl An {
@@ -324,6 +343,8 @@ impl An {
             min_low: usize::MAX,
             pure_memo: HashMap::new(),
             notes: BTreeSet::new(),
+            root_file: 0,
+            reachable: Vec::new(),
             obligations: Vec::new(),
         }
     }
@@ -462,11 +483,11 @@ impl An {
             .collect()
     }
 
-    fn resolve_type(&self, ns: &[String], path: &[String]) -> Option<usize> {
+    pub(crate) fn resolve_type(&self, ns: &[String], path: &[String]) -> Option<usize> {
         self.candidates(ns, path).iter().find_map(|c| self.type_ix.get(c).copied())
     }
 
-    fn resolve_func(&self, ns: &[String], path: &[String]) -> FuncRef {
+    pub(crate) fn resolve_func(&self, ns: &[String], path: &[String]) -> FuncRef {
         let cands = self.candidates(ns, path);
         if let Some(i) = cands.iter().find_map(|c| self.func_ix.get(c).copied()) {
             return FuncRef::User(i);
@@ -477,15 +498,15 @@ impl An {
         }
     }
 
-    fn func_node(&self, f: usize) -> usize {
+    pub(crate) fn func_node(&self, f: usize) -> usize {
         self.types.len() + f
     }
 
-    fn main_node(&self) -> usize {
+    pub(crate) fn main_node(&self) -> usize {
         self.types.len() + self.funcs.len()
     }
 
-    fn node_name(&self, n: usize) -> String {
+    pub(crate) fn node_name(&self, n: usize) -> String {
         if n < self.types.len() {
             self.types[n].full.clone()
         } else if n < self.main_node() {
@@ -495,7 +516,7 @@ impl An {
         }
     }
 
-    fn ctx_of(&self, node: usize) -> Ctx {
+    pub(crate) fn ctx_of(&self, node: usize) -> Ctx {
         if node < self.types.len() {
             let t = &self.types[node];
             let kind = match t.kind {
@@ -520,7 +541,7 @@ impl An {
     // ---- sizes -----------------------------------------------------------
 
     /// Lower bounds, in bits, on what instantiating a type consumes.
-    fn type_min(&mut self, t: usize) -> Flow {
+    pub(crate) fn type_min(&mut self, t: usize) -> Flow {
         if let Some(f) = self.min_memo.get(&t) {
             return *f;
         }
@@ -565,7 +586,7 @@ impl An {
         flow
     }
 
-    fn ref_min(&mut self, cx: &Ctx, ty: &TypeRef) -> Flow {
+    pub(crate) fn ref_min(&mut self, cx: &Ctx, ty: &TypeRef) -> Flow {
         match &ty.base {
             TypeBase::Builtin(b) => Flow { end: Some(b.size().unwrap_or(0) * 8), exit: None, rewind: false },
             TypeBase::Custom { name, .. } => {
@@ -697,7 +718,9 @@ impl An {
         }
         let mut calls: Vec<(Vec<String>, Vec<Expr>)> = Vec::new();
         let mut type_uses: Vec<TypeRef> = Vec::new();
+        let mut constants: Vec<Vec<String>> = Vec::new();
         for_each_expr(e, &mut |x| match x {
+            Expr::Scoped(path) if path.len() >= 2 => constants.push(path[..path.len() - 1].to_vec()),
             Expr::Call { name, args, .. } => calls.push((name.clone(), args.clone())),
             Expr::SizeOf(TypeOrExpr::Type(t))
             | Expr::AddressOf(TypeOrExpr::Type(t))
@@ -706,6 +729,14 @@ impl An {
             | Expr::Reinterpret { ty: t, .. } => type_uses.push(t.clone()),
             _ => {}
         });
+        // `E::A` uses the enum `E`.
+        if ph == Phase::Edges {
+            for path in &constants {
+                if let Some(t) = self.resolve_type(&cx.ns, path) {
+                    self.add_edge(cx.node, t, EdgeKind::Use);
+                }
+            }
+        }
         let mut rewind = false;
         for t in &type_uses {
             // `sizeof(x)` parses `x` as a type; a name that is not one is a
@@ -796,7 +827,7 @@ impl An {
         }
     }
 
-    fn walk(&mut self, cx: &Ctx, stmts: &[Stmt], mut reach: Option<u64>, ph: Phase) -> Flow {
+    pub(crate) fn walk(&mut self, cx: &Ctx, stmts: &[Stmt], mut reach: Option<u64>, ph: Phase) -> Flow {
         let mut exit: Option<u64> = None;
         let mut rewind = false;
         let reads = cx.reads();
@@ -1208,7 +1239,7 @@ impl An {
                 if !*up {
                     continue;
                 }
-                if refs.iter().any(|(n, k)| !matches!(k, EdgeKind::Jump | EdgeKind::Scratch) && self.rewind[*n]) {
+                if refs.iter().any(|(n, k)| !matches!(k, EdgeKind::Jump | EdgeKind::Scratch | EdgeKind::Use) && self.rewind[*n]) {
                     why = "something in the loop may move the cursor back".to_string();
                     continue;
                 }
@@ -1324,7 +1355,7 @@ impl An {
 
     // ---- the whole analysis ----------------------------------------------
 
-    fn run(mut self) -> Report {
+    pub(crate) fn run(&mut self) -> Report {
         let n = self.main_node() + 1;
         self.edges = vec![Vec::new(); n];
         self.rewind_local = vec![false; n];
@@ -1363,7 +1394,7 @@ impl An {
             let mut changed = false;
             for a in 0..n {
                 for &(b, kind) in &self.edges[a] {
-                    if !matches!(kind, EdgeKind::Jump | EdgeKind::Scratch) && self.rewind[b] && !self.rewind[a] {
+                    if !matches!(kind, EdgeKind::Jump | EdgeKind::Scratch | EdgeKind::Use) && self.rewind[b] && !self.rewind[a] {
                         self.rewind[a] = true;
                         changed = true;
                     }
@@ -1392,7 +1423,7 @@ impl An {
         self.cycles(&reachable);
         let mut obligations = std::mem::take(&mut self.obligations);
         obligations.sort_by(|a, b| (a.file.as_str(), a.line, a.what.as_str()).cmp(&(b.file.as_str(), b.line, b.what.as_str())));
-        Report {
+        let report = Report {
             obligations,
             notes: {
                 let texts: BTreeSet<String> =
@@ -1401,7 +1432,9 @@ impl An {
             },
             reachable_types: (0..self.types.len()).filter(|i| reachable[*i]).count(),
             reachable_functions: (self.types.len()..n - 1).filter(|i| reachable[*i]).count(),
-        }
+        };
+        self.reachable = reachable;
+        report
     }
 
     /// Does the body of `node` assign to a variable it does not declare,
@@ -1440,7 +1473,10 @@ impl An {
     /// One obligation per cycle class (strongly connected component).
     fn cycles(&mut self, reachable: &[bool]) {
         let n = reachable.len();
-        let comps = sccs(n, &self.edges);
+        // Naming a type is not evaluating it.
+        let evaluated: Vec<Vec<(usize, EdgeKind)>> =
+            self.edges.iter().map(|es| es.iter().copied().filter(|e| e.1 != EdgeKind::Use).collect()).collect();
+        let comps = sccs(n, &evaluated);
         let mut comp_of = vec![0usize; n];
         for (i, c) in comps.iter().enumerate() {
             for &v in c {
@@ -1448,7 +1484,7 @@ impl An {
             }
         }
         for (ci, comp) in comps.iter().enumerate() {
-            let cyclic = comp.len() > 1 || self.edges[comp[0]].iter().any(|e| e.0 == comp[0]);
+            let cyclic = comp.len() > 1 || evaluated[comp[0]].iter().any(|e| e.0 == comp[0]);
             if !cyclic || !reachable[comp[0]] {
                 continue;
             }
@@ -1456,7 +1492,7 @@ impl An {
             members.sort();
             let internal: Vec<(usize, usize, EdgeKind)> = members
                 .iter()
-                .flat_map(|&a| self.edges[a].iter().filter(|e| comp_of[e.0] == ci).map(move |e| (a, e.0, e.1)))
+                .flat_map(|&a| evaluated[a].iter().filter(|e| comp_of[e.0] == ci).map(move |e| (a, e.0, e.1)))
                 .collect();
             let names: Vec<String> = members.iter().take(4).map(|m| format!("`{}`", self.node_name(*m))).collect();
             let more = if members.len() > 4 { format!(" and {} more", members.len() - 4) } else { String::new() };
@@ -1516,7 +1552,7 @@ impl An {
 // Helpers on the syntax tree
 
 /// A non-negative integer literal (plain integers are lowered as signed).
-fn literal(e: &Expr) -> Option<u64> {
+pub(crate) fn literal(e: &Expr) -> Option<u64> {
     match e {
         Expr::Literal(Literal::Unsigned(n)) => u64::try_from(*n).ok(),
         Expr::Literal(Literal::Signed(n)) => u64::try_from(*n).ok(),
@@ -1526,7 +1562,7 @@ fn literal(e: &Expr) -> Option<u64> {
 
 /// The counters of a loop: a variable or `$` that every completed round
 /// moves by a constant step. Returns (counter, goes up, step).
-fn counter_candidates(update: Option<&Stmt>, body: &[Stmt]) -> Vec<(LValue, bool, u128)> {
+pub(crate) fn counter_candidates(update: Option<&Stmt>, body: &[Stmt]) -> Vec<(LValue, bool, u128)> {
     let mut candidates = Vec::new();
     let mut assigned: Vec<LValue> = Vec::new();
     for_each_stmt(body, &mut |s| {
@@ -1636,7 +1672,7 @@ fn step_of(target: &LValue, value: &Expr) -> Option<(bool, u128)> {
     }
 }
 
-fn mirror(op: BinaryOp) -> BinaryOp {
+pub(crate) fn mirror(op: BinaryOp) -> BinaryOp {
     match op {
         BinaryOp::Lt => BinaryOp::Gt,
         BinaryOp::Gt => BinaryOp::Lt,
@@ -1646,7 +1682,7 @@ fn mirror(op: BinaryOp) -> BinaryOp {
     }
 }
 
-fn split_and<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
+pub(crate) fn split_and<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
     match e {
         Expr::Binary { op: BinaryOp::And, left, right } => {
             split_and(left, out);
@@ -1677,7 +1713,7 @@ fn has_continue(stmts: &[Stmt]) -> bool {
 
 /// Every statement in the list and in nested blocks (not in nested
 /// declarations).
-fn for_each_stmt(stmts: &[Stmt], f: &mut dyn FnMut(&Stmt)) {
+pub(crate) fn for_each_stmt(stmts: &[Stmt], f: &mut dyn FnMut(&Stmt)) {
     for s in stmts {
         f(s);
         match s {
@@ -1707,7 +1743,7 @@ fn for_each_stmt(stmts: &[Stmt], f: &mut dyn FnMut(&Stmt)) {
 
 /// The expressions a statement evaluates itself (not those of nested
 /// statements).
-fn stmt_exprs(s: &Stmt) -> Vec<&Expr> {
+pub(crate) fn stmt_exprs(s: &Stmt) -> Vec<&Expr> {
     let mut out: Vec<&Expr> = Vec::new();
     fn placement<'a>(p: &'a Option<Placement>, out: &mut Vec<&'a Expr>) {
         if let Some(p) = p {
@@ -1778,7 +1814,7 @@ fn stmt_exprs(s: &Stmt) -> Vec<&Expr> {
 }
 
 /// Every sub-expression, outermost first.
-fn for_each_expr(e: &Expr, f: &mut dyn FnMut(&Expr)) {
+pub(crate) fn for_each_expr(e: &Expr, f: &mut dyn FnMut(&Expr)) {
     f(e);
     let toe = |t: &TypeOrExpr, f: &mut dyn FnMut(&Expr)| {
         if let TypeOrExpr::Expr(x) = t {

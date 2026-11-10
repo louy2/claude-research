@@ -196,6 +196,49 @@ decided at run time reaches a limit. Along the way it found a loop in the
 `ne` pattern that never ends once its `u8` counter wraps; the counter
 check now stops it at the wrap.
 
+### Lint
+
+`hexpat lint <pattern> [data] [-I dir]... [--all]` runs the checks that
+would have caught the pattern bugs found while building this repository
+(`hexpat/src/lint.rs`). Warnings are things that go wrong on some input;
+notes are things to look at. The exit code is 2 if there is a warning.
+
+| check | what it reports | example from ImHex-Patterns |
+|---|---|---|
+| `duplicate-member` | a name declared twice on one path through a type body (through `if`, `match`, `try`/`catch`, a parent), or inside a loop | `gvas`: `propertyType` in arms of two `match`es; `msgpack`: `Type type` and later `s8 type` |
+| `narrow-counter` | a loop counter of a small type that its condition does not keep in range, or an unsigned counter tested with `>= 0` | `ne`: `for (u8 i = 0, $+i < ..., i = i + 1)` |
+| `narrow-offset`, `narrowing` | an offset, a literal or a wider field stored in an 8- or 16-bit variable | `pe`: `u8 cursor = $`; `bcss`: `const u8 max_path_size = 1000` |
+| `missing-case` | an `if`/`else if` chain or a `match` over enum constants with no branch for some of them and no fallback; a warning if the type then reads nothing | `pe`: `FunctionTableEntry` handles 4 of 28 architectures |
+| `termination` | what the static termination check does not prove (warning) or leaves to the run-time checks (note) | |
+| `unused`, `unresolved` | declarations the pattern never uses; names that do not resolve | |
+
+With a data file, the pattern is also evaluated on it:
+
+| check | what it reports |
+|---|---|
+| `coverage` | how many bytes are described, and the ranges that are not |
+| `overlap` | bytes described by more than one pattern, grouped by the pattern that lies over the others |
+| `enum-value` | an enum field whose value is not one of its entries |
+| `evaluation` | the error, if the pattern fails on the file |
+
+```console
+$ target/release/hexpat lint ne.hexpat -I includes
+ne.hexpat:30: warning[narrow-counter]: loop counter `i` is u8 and wraps at 255, but the condition does not keep it below that; the loop then never ends
+$ target/release/hexpat lint psafe3.hexpat test.psafe3 -I includes
+test.psafe3: note[coverage]: 200 of 600 bytes are described (33.3%); not described: 0x98-0x227 (400 bytes)
+test.psafe3: note[overlap]: 32 byte(s) are described more than once: `eof.HMAC` shares 32 byte(s) with 2 other patterns (first `marker` at 0x228-0x237)
+$ scripts/lint-sweep.py            # the 243 patterns of ImHex-Patterns
+243 patterns: 209 without warnings, 34 with warnings, 0 not analysed
+```
+
+The static checks are syntactic. `duplicate-member` knows that `c` and
+`!c`, and ranges such as `v < 600` and `v >= 600`, exclude each other, but
+not that two `match`es on related values do; it says "may". By default only
+the pattern's own file is reported (`--all` adds the files it imports);
+text pulled in with `#include` counts as the pattern's own. The ten
+patterns in `formats/` have no warnings. `hexpat/tests/lint.rs` holds the
+cases.
+
 ### JSON export
 
 `hexpat run --json` and `hexpat format -f json` write the pattern tree in

@@ -18,7 +18,7 @@ use hexpat::interp::dump::DumpOptions;
 use hexpat::{Runtime, Value};
 
 fn usage() -> ExitCode {
-    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]... [--no-measure-checks]\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat termination <pattern> [-I dir]... [--all]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--inline-enums] [--root TYPE]");
+    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]... [--no-measure-checks]\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat termination <pattern> [-I dir]... [--all]\n  hexpat lint <pattern> [data] [-I dir]... [--all]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--inline-enums] [--root TYPE]");
     ExitCode::from(2)
 }
 
@@ -130,6 +130,7 @@ fn real_main() -> ExitCode {
         "emit-vest" => cmd_emit(&args),
         "emit-asn1" => cmd_emit_asn1(&args),
         "termination" => cmd_termination(&args),
+        "lint" => cmd_lint(&args),
         _ => usage(),
     }
 }
@@ -184,6 +185,62 @@ fn cmd_termination(args: &Args) -> ExitCode {
         ExitCode::from(3)
     } else {
         ExitCode::from(2)
+    }
+}
+
+/// Checks for pattern authors (`hexpat::lint`). With a data file, the
+/// pattern is also evaluated on it and coverage, overlap and enum values
+/// are reported. `--all` includes findings in imported files.
+/// Exit code 2 if there is a warning.
+fn cmd_lint(args: &Args) -> ExitCode {
+    use hexpat::lint::{lint, lint_data, Level};
+    let Some(pattern) = args.positional.get(1) else { return usage() };
+    let path = Path::new(pattern);
+    let source = match read_pattern(path) {
+        Ok(s) => s,
+        Err(c) => return c,
+    };
+    let mut findings = match lint(&source, path, &args.includes, args.all) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("{}: {}", path.display(), e);
+            return ExitCode::from(1);
+        }
+    };
+    if let Some(input) = args.positional.get(2) {
+        let data = match std::fs::read(input) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("cannot read {}: {}", input, e);
+                return ExitCode::from(1);
+            }
+        };
+        let name = Path::new(input).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let mut rt = Runtime::new(data);
+        rt.limit_caps.max_recursion = CLI_MAX_DEPTH;
+        for inc in &args.includes {
+            rt.add_include_path(inc);
+        }
+        if let Err(e) = rt.run_source(&source, path.parent()) {
+            findings.push(hexpat::lint::Finding {
+                file: name.clone(),
+                line: 0,
+                level: Level::Warning,
+                check: "evaluation",
+                message: format!("the pattern fails on this file: {}", e),
+            });
+        }
+        findings.extend(lint_data(&rt, &name));
+    }
+    for f in &findings {
+        println!("{}", f);
+    }
+    let warnings = findings.iter().filter(|f| f.level == Level::Warning).count();
+    println!("{} warning(s), {} note(s)", warnings, findings.len() - warnings);
+    if warnings > 0 {
+        ExitCode::from(2)
+    } else {
+        ExitCode::SUCCESS
     }
 }
 

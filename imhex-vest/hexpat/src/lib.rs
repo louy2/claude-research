@@ -12,6 +12,7 @@ pub mod emit;
 pub mod emit_asn1;
 pub mod error;
 pub mod interp;
+pub mod lint;
 pub mod lower;
 pub mod preprocess;
 pub mod reader;

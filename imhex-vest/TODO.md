@@ -168,6 +168,15 @@ Open:
     2 cycles in gvas and one using `std::ptr::NullablePtr`).
 - [ ] `import * from x as Name` (a whole pattern as a type) is not
   followed; the analysis reports the type as unknown.
+- [ ] `hexpat lint`, next steps:
+  - `duplicate-member` does not see that two `match`es on related values
+    exclude each other (two of the five gvas findings are of this kind).
+  - Lines of text pulled in with `#include` are reported as the
+    pattern's own, with the included file's line numbers.
+  - A check that a declared size matches what was parsed, and which
+    branches of a pattern no test file exercises (branch coverage).
+  - `missing-case` could feed the termination check: a dispatch with a
+    branch for every enum value cannot leave an array entry empty.
 - [ ] Evaluation gets slower the deeper types nest. Found by
   `scripts/termination-fuzz.py`: a 64 KiB bencode input nested about 250
   deep took 18 s for 1 million steps, because every name lookup rebuilt
@@ -222,6 +231,19 @@ Not filed; drafts only.
   - `pe.hexpat` has a related loop,
     `for (u8 cursor = $, cursor < $+16, cursor += 1)`. By reading, it
     cannot end when `$ + 16` is above 255; not reproduced.
+- [ ] **ImHex-Patterns: findings of `hexpat lint`** (`scripts/lint-sweep.py
+  --list CHECK`). Read against the source, not reproduced on a file;
+  check each before filing.
+  - `bcss.hexpat`: `const u8 max_path_size = 1000;` does not fit.
+  - A `u8` (or `u16`, `s16`) loop counter against `sizeof(...)`, a string
+    length or a wider field: `bink_container`, `dotnet_binaryformatter`,
+    `fbx`, `gen`, `kindle_update`, `notepad-cache`, `notepad-state`,
+    `notepadwindowstate`, `rar`, `rkvd`, `terminfo`.
+  - A member declared twice: `msgpack` (`Type type`, then `s8 type`);
+    after a partly failed `try`: `adtfdat`, `msf`, `tiff`; a default local
+    and then a member of the same name: `pf`.
+  - `pe.hexpat`: `FunctionTableEntry` has branches for 4 of the 28
+    `ArchitectureType` values and reads nothing for the others.
 - [ ] **PatternLanguage: the redeclaration check skips `match` arms.**
   - Duplicates at struct level and inside `if` are rejected at
     compile time (`validator.cpp` descends into `if`, not `match`).
