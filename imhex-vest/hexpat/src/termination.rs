@@ -20,13 +20,27 @@
 //! * **no cycle**: types that only reach other types need no argument, which
 //!   is the rank argument of `interval-vest`.
 //!
-//! A cycle through a placement or a pointer has no static argument, because
-//! the offsets come from the data; it is reported as needing a run-time
-//! check. Everything else is "not proven".
+//! Where there is no static argument but the interpreter's measure checks
+//! (`interp::Limits::check_measures`) decide the question for each input,
+//! the verdict is "run-time check":
 //!
-//! The arguments are syntactic and assume that integer counters do not wrap
-//! and that reads past the end fail. A run-time check of the measure would
-//! close both gaps; see `TODO.md`.
+//! * an array whose entries may be empty or step back: every entry that
+//!   does not end the array must end past where it started;
+//! * a cycle of types through a placement or a pointer, or one that may not
+//!   read a byte between two instances: no type may be instantiated inside
+//!   an instance of itself (same template arguments) at the same offset.
+//!
+//! Everything else is "not proven", and only the interpreter's limits end
+//! it: loops without a recognisable counter, recursive functions, and
+//! cycles that never put an instance at the cursor.
+//!
+//! The static arguments hold for evaluation with the measure checks on.
+//! The checks keep the cursor inside the data (so progress is bounded) and
+//! catch a counter that wraps around; without them `$ += 4` could walk past
+//! the end without reading, and a `u8` counter could wrap below its bound.
+//! Two things stay outside the measures and are left to the depth limit:
+//! template arguments that take ever new values, and placements into
+//! sections created along the way.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -40,7 +54,9 @@ use crate::interp::Runtime;
 pub enum Verdict {
     /// Terminates; the string names the argument.
     Proven(String),
-    /// No static argument exists, but a run-time check can decide it.
+    /// No static argument; the interpreter's measure checks
+    /// (`Limits::check_measures`) decide it for each input. The string says
+    /// why there is no static argument.
     RuntimeCheck(String),
     NotProven(String),
 }
@@ -82,6 +98,13 @@ impl Report {
     pub fn all_proven(&self) -> bool {
         let (_, r, n) = self.count();
         r == 0 && n == 0 && self.notes.is_empty()
+    }
+
+    /// True if every obligation is proven or decided by a run-time measure
+    /// check, and nothing was left unresolved: no evaluation of the pattern
+    /// depends on the interpreter's limits to stop.
+    pub fn guarded(&self) -> bool {
+        self.count().2 == 0 && self.notes.is_empty()
     }
 }
 
@@ -147,6 +170,12 @@ enum EdgeKind {
     /// Instantiated at an address taken from a placement or a pointer.
     Jump,
     Call,
+    /// Evaluated away from the cursor, in a section of its own: `sizeof`,
+    /// a cast, a local variable.
+    Scratch,
+    /// A parent type or the target of an alias: resolved, and (for a
+    /// parent) run in the body of the type that names it.
+    Resolve,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -250,6 +279,8 @@ struct An {
     forwards: HashMap<(usize, usize), Vec<(usize, usize)>>,
     /// (template, parameter index, argument type) for every instantiation.
     arg_edges: Vec<(usize, usize, ArgTy)>,
+    /// (user, template): the user computes a value argument of the template.
+    computed_args: HashSet<(usize, usize)>,
     /// Every type a template type parameter is bound to, after `run`.
     param_args: HashMap<(usize, usize), Vec<ArgTy>>,
     rewind_local: Vec<bool>,
@@ -283,6 +314,7 @@ impl An {
             forwards: HashMap::new(),
             arg_edges: Vec::new(),
             param_args: HashMap::new(),
+            computed_args: HashSet::new(),
             rewind_local: Vec::new(),
             wnl_local: Vec::new(),
             rewind: Vec::new(),
@@ -554,7 +586,7 @@ impl An {
         let mut exit = None;
         let mut rewind = false;
         for parent in &d.parents {
-            let target = self.type_ref(cx, parent, EdgeKind::Inline { progress: false }, ph);
+            let target = self.type_ref(cx, parent, EdgeKind::Resolve, ph);
             let m = self.ref_min(cx, parent);
             exit = min_opt(exit, add_opt(reach, m.exit));
             reach = add_opt(reach, m.end);
@@ -601,6 +633,13 @@ impl An {
             if !is_type {
                 if let TemplateArg::Expr(e) = arg {
                     self.expr(cx, e, ph);
+                    let mut computed = false;
+                    for_each_expr(e, &mut |x| {
+                        computed |= matches!(x, Expr::Binary { .. } | Expr::Unary { .. } | Expr::Call { .. } | Expr::Ternary { .. } | Expr::Dollar)
+                    });
+                    if computed && ph == Phase::Edges {
+                        self.computed_args.insert((cx.node, t));
+                    }
                 }
                 continue;
             }
@@ -677,9 +716,8 @@ impl An {
                     continue;
                 }
             }
-            if let Some(n) = self.type_ref(cx, t, EdgeKind::Inline { progress: false }, ph) {
-                rewind |= ph == Phase::Loops && self.rewind[n];
-            }
+            // Evaluated in a scratch section; the cursor is put back.
+            self.type_ref(cx, t, EdgeKind::Scratch, ph);
         }
         for (name, args) in &calls {
             rewind |= self.call(cx, name, ph);
@@ -767,7 +805,13 @@ impl An {
             match s {
                 Stmt::Var(d) => {
                     let local = d.value.is_some() || d.in_var || d.out_var || !reads;
-                    let kind = if d.placement.is_some() { EdgeKind::Jump } else { EdgeKind::Inline { progress } };
+                    let kind = if d.placement.is_some() {
+                        EdgeKind::Jump
+                    } else if d.value.is_some() || cx.kind == CtxKind::Func {
+                        EdgeKind::Scratch
+                    } else {
+                        EdgeKind::Inline { progress }
+                    };
                     let target = self.type_ref(cx, &d.ty, kind, ph);
                     rewind |= self.placement(cx, d.placement.as_ref(), ph);
                     rewind |= self.opt_expr(cx, d.value.as_ref(), ph);
@@ -785,7 +829,13 @@ impl An {
                 }
                 Stmt::Array(d) => {
                     let local = d.init.is_some() || !reads;
-                    let kind = if d.placement.is_some() { EdgeKind::Jump } else { EdgeKind::Inline { progress } };
+                    let kind = if d.placement.is_some() {
+                        EdgeKind::Jump
+                    } else if d.init.is_some() || cx.kind == CtxKind::Func {
+                        EdgeKind::Scratch
+                    } else {
+                        EdgeKind::Inline { progress }
+                    };
                     let target = self.type_ref(cx, &d.ty, kind, ph);
                     rewind |= self.placement(cx, d.placement.as_ref(), ph);
                     rewind |= self.attrs(cx, &d.attrs, ph);
@@ -804,7 +854,9 @@ impl An {
                         rewind |= target_rewind;
                     }
                     if ph == Phase::Loops && !matches!(d.size, ArraySize::Fixed(_)) {
-                        let verdict = self.array_verdict(cx, &d.ty, entry, target_rewind || cond_rewind);
+                        // The condition cannot move the array's cursor: the
+                        // interpreter puts it back.
+                        let verdict = self.array_verdict(cx, &d.ty, entry, target_rewind);
                         self.oblige(cx, d.line, format!("array `{}`", d.name), verdict);
                     }
                     if d.placement.is_none() && !local && !d.attrs.iter().any(|a| a.is("no_unique_address")) {
@@ -842,11 +894,7 @@ impl An {
                             let r = self.expr(cx, e, ph);
                             rewind |= r;
                             if ph == Phase::Loops {
-                                let v = if r {
-                                    Verdict::NotProven("the condition calls something that may move the cursor back".to_string())
-                                } else {
-                                    Verdict::Proven("each step skips one byte".to_string())
-                                };
+                                let v = Verdict::Proven("each step skips one byte".to_string());
                                 self.oblige(cx, *line, "padding".to_string(), v);
                             }
                         }
@@ -1009,7 +1057,7 @@ impl An {
             }
             TKind::Alias(ty, attrs) => {
                 let (ty, attrs) = (ty.clone(), attrs.clone());
-                self.type_ref(&cx, &ty, EdgeKind::Inline { progress: false }, ph);
+                self.type_ref(&cx, &ty, EdgeKind::Resolve, ph);
                 self.attrs(&cx, &attrs, ph);
             }
             TKind::Forward => {}
@@ -1029,7 +1077,7 @@ impl An {
                 // Judge the array for every type the parameter is bound to.
                 let args = self.param_args.get(&(cx.node, i)).cloned().unwrap_or_default();
                 if args.is_empty() || rewind {
-                    return Verdict::NotProven("the entry type is a template parameter, so its size is unknown".to_string());
+                    return Verdict::RuntimeCheck("the entry type is a template parameter, so its size is unknown".to_string());
                 }
                 let mut least = u64::MAX;
                 for a in args {
@@ -1044,7 +1092,7 @@ impl An {
                     };
                     match bits {
                         Some(bits) if bits < 8 => {
-                            return Verdict::NotProven(format!(
+                            return Verdict::RuntimeCheck(format!(
                                 "the entry type is a template parameter; with {} an entry can be empty or move the cursor back",
                                 name
                             ));
@@ -1061,12 +1109,12 @@ impl An {
             }
         }
         if rewind {
-            return Verdict::NotProven("an entry or the condition may move the cursor back".to_string());
+            return Verdict::RuntimeCheck("an entry may move the cursor back".to_string());
         }
         match entry {
             None => Verdict::Proven("every entry ends the array".to_string()),
             Some(bits) if bits >= 8 => Verdict::Proven(format!("each entry reads at least {} byte(s)", bits / 8)),
-            Some(_) => Verdict::NotProven("an entry can be empty".to_string()),
+            Some(_) => Verdict::RuntimeCheck("an entry can be empty".to_string()),
         }
     }
 
@@ -1120,33 +1168,13 @@ impl An {
     /// The counter argument: a variable (or `$`) moves by a constant step
     /// towards a bound that the loop does not change.
     fn counter_argument(&mut self, cx: &Ctx, cond: &Expr, update: Option<&Stmt>, body: &[Stmt]) -> std::result::Result<String, String> {
-        // Candidate counters and their direction.
-        let mut candidates: Vec<(LValue, bool, u128)> = Vec::new();
+        let candidates = counter_candidates(update, body);
         let mut assigned: Vec<LValue> = Vec::new();
         for_each_stmt(body, &mut |s| {
             if let Stmt::Assign { target, .. } = s {
                 assigned.push(target.clone());
             }
         });
-        let assigned_in_body = |t: &LValue| assigned.iter().filter(|a| *a == t).count();
-        if let Some(Stmt::Assign { target, value, .. }) = update {
-            if let Some((up, step)) = step_of(target, value) {
-                if assigned_in_body(target) == 0 {
-                    candidates.push((target.clone(), up, step));
-                }
-            }
-        }
-        if update.is_none() && !has_continue(body) {
-            for s in body {
-                if let Stmt::Assign { target, value, .. } = s {
-                    if let Some((up, step)) = step_of(target, value) {
-                        if assigned_in_body(target) == 1 {
-                            candidates.push((target.clone(), up, step));
-                        }
-                    }
-                }
-            }
-        }
         if candidates.is_empty() {
             return Err("no counter with a constant step".to_string());
         }
@@ -1167,8 +1195,6 @@ impl An {
         if let Some(Stmt::Assign { target: LValue::Ident(n), .. }) = update {
             assigned_names.insert(n.clone());
         }
-        let mut conjuncts = Vec::new();
-        split_and(cond, &mut conjuncts);
         let mut why = "the condition does not bound the counter".to_string();
         for (counter, up, step) in &candidates {
             let counter_expr = match counter {
@@ -1182,24 +1208,12 @@ impl An {
                 if !*up {
                     continue;
                 }
-                if refs.iter().any(|(n, k)| *k != EdgeKind::Jump && self.rewind[*n]) {
+                if refs.iter().any(|(n, k)| !matches!(k, EdgeKind::Jump | EdgeKind::Scratch) && self.rewind[*n]) {
                     why = "something in the loop may move the cursor back".to_string();
                     continue;
                 }
             }
-            for c in &conjuncts {
-                let Expr::Binary { op, left, right } = c else { continue };
-                let (op, bound) = if **left == counter_expr {
-                    (*op, &**right)
-                } else if **right == counter_expr {
-                    (mirror(*op), &**left)
-                } else {
-                    continue;
-                };
-                let towards = if *up { matches!(op, BinaryOp::Lt | BinaryOp::Le) } else { matches!(op, BinaryOp::Gt | BinaryOp::Ge) };
-                if !towards {
-                    continue;
-                }
+            for bound in counter_bounds(cond, counter, *up) {
                 match self.invariant(cx, bound, &counter_expr, &assigned_names, path_assign) {
                     Ok(()) => {
                         let name = match counter {
@@ -1349,7 +1363,7 @@ impl An {
             let mut changed = false;
             for a in 0..n {
                 for &(b, kind) in &self.edges[a] {
-                    if kind != EdgeKind::Jump && self.rewind[b] && !self.rewind[a] {
+                    if !matches!(kind, EdgeKind::Jump | EdgeKind::Scratch) && self.rewind[b] && !self.rewind[a] {
                         self.rewind[a] = true;
                         changed = true;
                     }
@@ -1449,19 +1463,37 @@ impl An {
             let what = format!("cycle through {}{}", names.join(", "), more);
             let has_func = members.iter().any(|m| *m >= self.types.len());
             let all_func = members.iter().all(|m| *m >= self.types.len());
+            // The run-time rule for a cycle of types: no type is
+            // instantiated inside an instance of itself (same template
+            // arguments) at the same offset. It decides every cycle whose
+            // rounds each put an instance at the cursor or at a placement.
+            let resolve: Vec<(usize, usize)> = internal.iter().filter(|e| e.2 == EdgeKind::Resolve).map(|e| (e.0, e.1)).collect();
             let verdict = if all_func {
                 Verdict::NotProven("recursive function; no decreasing argument was looked for".to_string())
             } else if has_func {
-                Verdict::NotProven("types and functions that reach each other".to_string())
+                Verdict::NotProven("types and functions that reach each other; only the depth limit ends this".to_string())
+            } else if has_cycle(&members, &resolve) {
+                Verdict::NotProven("a type inherits from itself or is an alias of itself".to_string())
+            } else if internal.iter().any(|e| e.2 == EdgeKind::Scratch) {
+                Verdict::NotProven(
+                    "the cycle evaluates a type away from the cursor (`sizeof`, a cast, a local); only the depth limit ends this".to_string(),
+                )
+            } else if internal.iter().any(|e| self.computed_args.contains(&(e.0, e.1))) {
+                Verdict::NotProven(
+                    "a template argument is computed anew at each level, so no instance repeats; only the depth limit ends this".to_string(),
+                )
             } else {
                 // Every cycle of inline edges needs one edge with progress.
-                let stuck: Vec<(usize, usize)> =
-                    internal.iter().filter(|e| e.2 == EdgeKind::Inline { progress: false }).map(|e| (e.0, e.1)).collect();
+                let stuck: Vec<(usize, usize)> = internal
+                    .iter()
+                    .filter(|e| matches!(e.2, EdgeKind::Inline { progress: false } | EdgeKind::Resolve))
+                    .map(|e| (e.0, e.1))
+                    .collect();
                 let jump = internal.iter().any(|e| e.2 == EdgeKind::Jump);
                 if has_cycle(&members, &stuck) {
-                    Verdict::NotProven("a type can reach itself without reading a byte first".to_string())
+                    Verdict::RuntimeCheck("a type can reach itself without reading a byte first".to_string())
                 } else if members.iter().any(|m| self.rewind[*m]) {
-                    Verdict::NotProven("something in the cycle may move the cursor back".to_string())
+                    Verdict::RuntimeCheck("something in the cycle may move the cursor back".to_string())
                 } else if jump {
                     Verdict::RuntimeCheck("the cycle goes through a placement or a pointer, whose target comes from the data".to_string())
                 } else {
@@ -1490,6 +1522,81 @@ fn literal(e: &Expr) -> Option<u64> {
         Expr::Literal(Literal::Signed(n)) => u64::try_from(*n).ok(),
         _ => None,
     }
+}
+
+/// The counters of a loop: a variable or `$` that every completed round
+/// moves by a constant step. Returns (counter, goes up, step).
+fn counter_candidates(update: Option<&Stmt>, body: &[Stmt]) -> Vec<(LValue, bool, u128)> {
+    let mut candidates = Vec::new();
+    let mut assigned: Vec<LValue> = Vec::new();
+    for_each_stmt(body, &mut |s| {
+        if let Stmt::Assign { target, .. } = s {
+            assigned.push(target.clone());
+        }
+    });
+    let assigned_in_body = |t: &LValue| assigned.iter().filter(|a| *a == t).count();
+    // A `for` loop: the update statement, if the body leaves the counter alone.
+    if let Some(Stmt::Assign { target, value, .. }) = update {
+        if let Some((up, step)) = step_of(target, value) {
+            if assigned_in_body(target) == 0 {
+                candidates.push((target.clone(), up, step));
+            }
+        }
+    }
+    // A `while` loop: a step at the top level of the body that is the only
+    // assignment to the counter and that no `continue` can skip.
+    if update.is_none() && !has_continue(body) {
+        for s in body {
+            if let Stmt::Assign { target, value, .. } = s {
+                if let Some((up, step)) = step_of(target, value) {
+                    if assigned_in_body(target) == 1 {
+                        candidates.push((target.clone(), up, step));
+                    }
+                }
+            }
+        }
+    }
+    candidates
+}
+
+/// The bounds of `counter` in `cond`: the other side of every conjunct that
+/// compares the counter in the direction it moves.
+fn counter_bounds<'a>(cond: &'a Expr, counter: &LValue, up: bool) -> Vec<&'a Expr> {
+    let counter_expr = match counter {
+        LValue::Ident(n) => Expr::Ident(n.clone()),
+        LValue::Dollar => Expr::Dollar,
+        LValue::Path(_) => return Vec::new(),
+    };
+    let mut conjuncts = Vec::new();
+    split_and(cond, &mut conjuncts);
+    let mut out = Vec::new();
+    for c in conjuncts {
+        let Expr::Binary { op, left, right } = c else { continue };
+        let (op, bound) = if **left == counter_expr {
+            (*op, &**right)
+        } else if **right == counter_expr {
+            (mirror(*op), &**left)
+        } else {
+            continue;
+        };
+        let towards = if up { matches!(op, BinaryOp::Lt | BinaryOp::Le) } else { matches!(op, BinaryOp::Gt | BinaryOp::Ge) };
+        if towards {
+            out.push(bound);
+        }
+    }
+    out
+}
+
+/// The counters of a loop that its condition bounds, with their direction
+/// (true: up). The static argument relies on each of them moving in every
+/// round; the interpreter checks at run time that they do, which catches a
+/// counter that wraps around.
+pub(crate) fn loop_counters(cond: &Expr, update: Option<&Stmt>, body: &[Stmt]) -> Vec<(LValue, bool)> {
+    counter_candidates(update, body)
+        .into_iter()
+        .filter(|(c, up, _)| !counter_bounds(cond, c, *up).is_empty())
+        .map(|(c, up, _)| (c, up))
+        .collect()
 }
 
 /// `$ + n` or `n + $` with a literal `n`: the cursor moves forward.

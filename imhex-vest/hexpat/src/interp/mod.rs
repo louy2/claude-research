@@ -65,6 +65,35 @@ pub enum Binding {
     Value(Value),
 }
 
+/// A struct, union or bitfield instance that is being created.
+struct LiveInstance {
+    /// Address of the declaration, as its identity.
+    decl: usize,
+    section: usize,
+    offset: u64,
+    bindings: Vec<(String, Binding)>,
+}
+
+/// Template bindings as text, to tell two instances of a template apart.
+fn bindings_key(bindings: &[(String, Binding)]) -> String {
+    let mut out = String::new();
+    for (name, b) in bindings {
+        out.push_str(name);
+        out.push('=');
+        match b {
+            Binding::Type(i) => {
+                out.push_str(&i.display);
+                out.push('<');
+                out.push_str(&bindings_key(&i.bindings));
+                out.push('>');
+            }
+            Binding::Value(v) => out.push_str(&v.to_display_string()),
+        }
+        out.push(';');
+    }
+    out
+}
+
 /// A fully resolved type: a builtin, or a declaration plus template bindings.
 #[derive(Debug, Clone)]
 pub struct Instance {
@@ -234,6 +263,21 @@ pub struct Limits {
     /// loops nest; this one does not. Once it is exceeded `try`/`catch` no
     /// longer catches errors.
     pub max_steps: u64,
+    /// Check the termination measures while evaluating (on by default):
+    ///
+    /// * `$` is never set past the end of its section, and padding does not
+    ///   run past it;
+    /// * an entry of a `[while(...)]` or `[]` array that does not end the
+    ///   array ends at a larger cursor than it started at, inside the data;
+    /// * no type is instantiated inside an instance of itself with the same
+    ///   template arguments at the same offset, or past the end of the data;
+    /// * a loop counter that the condition bounds moves in its direction in
+    ///   every round (it does not wrap around).
+    ///
+    /// These are the measures the static check (`crate::termination`)
+    /// argues with. A pattern that breaks one fails here, at the place where
+    /// it happens, instead of running into one of the limits above.
+    pub check_measures: bool,
 }
 
 impl Default for Limits {
@@ -244,6 +288,7 @@ impl Default for Limits {
             max_loop_iterations: 50_000_000,
             max_recursion: 256,
             max_steps: 100_000_000,
+            check_measures: true,
         }
     }
 }
@@ -279,6 +324,9 @@ pub struct Runtime {
     depth: usize,
     /// Statements executed and patterns created so far.
     steps: u64,
+    /// The struct, union and bitfield instances being created, innermost
+    /// last.
+    instances: Vec<LiveInstance>,
     /// Extra include-directory search for `import a.b` style paths.
     defines: HashMap<String, String>,
     /// Set when a `break` ran inside a struct body, so that an enclosing
@@ -320,6 +368,7 @@ impl Runtime {
             out_vars: HashMap::new(),
             depth: 0,
             steps: 0,
+            instances: Vec::new(),
             defines: HashMap::new(),
             pending_break: false,
             pending_continue: false,
@@ -556,7 +605,14 @@ impl Runtime {
             }
         }
         // Types defined in enclosing struct namespaces are visible too.
+        // Nested scopes mostly share one namespace; each is looked at once,
+        // so that a lookup does not cost more the deeper the nesting is.
+        let mut seen: Vec<&[String]> = vec![&ns];
         for s in self.scopes.iter().rev() {
+            if seen.contains(&s.namespace.as_slice()) {
+                continue;
+            }
+            seen.push(&s.namespace);
             for i in (1..=s.namespace.len()).rev() {
                 let cand = format!("{}::{}", s.namespace[..i].join("::"), joined);
                 if !out.contains(&cand) {
@@ -806,6 +862,68 @@ impl Runtime {
         self.steps > self.limits.max_steps
     }
 
+    /// The counters of a loop that the run-time check watches.
+    fn loop_counters(&self, cond: &Expr, update: Option<&Stmt>, body: &[Stmt]) -> Vec<(LValue, bool)> {
+        if self.limits.check_measures {
+            crate::termination::loop_counters(cond, update, body)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// The current value of each counter (`None` if it is not a number).
+    fn counter_values(&mut self, counters: &[(LValue, bool)]) -> Vec<Option<Value>> {
+        counters
+            .iter()
+            .map(|(c, _)| match c {
+                LValue::Dollar => Some(Value::Unsigned(self.cursor as u128)),
+                LValue::Ident(n) => match self.lookup_slot(n).map(|s| s.value.clone()) {
+                    Some(v @ (Value::Unsigned(_) | Value::Signed(_) | Value::Float(_))) => Some(v),
+                    _ => None,
+                },
+                LValue::Path(_) => None,
+            })
+            .collect()
+    }
+
+    /// After a completed round, every counter has moved in its direction.
+    /// One that has not has wrapped around (or stopped changing, for a
+    /// float), and the loop would not end the way its condition says.
+    fn check_counters(&mut self, counters: &[(LValue, bool)], before: &[Option<Value>]) -> Result<()> {
+        if counters.is_empty() {
+            return Ok(());
+        }
+        let after = self.counter_values(counters);
+        for (((counter, up), old), new) in counters.iter().zip(before).zip(&after) {
+            let (Some(old), Some(new)) = (old, new) else { continue };
+            let moved = match (old, new) {
+                (Value::Float(_), _) | (_, Value::Float(_)) => {
+                    let (a, b) = (old.as_f64()?, new.as_f64()?);
+                    if *up { b > a } else { b < a }
+                }
+                (Value::Unsigned(a), Value::Unsigned(b)) => if *up { b > a } else { b < a },
+                _ => {
+                    let (a, b) = (old.as_i128()?, new.as_i128()?);
+                    if *up { b > a } else { b < a }
+                }
+            };
+            if !moved {
+                let name = match counter {
+                    LValue::Ident(n) => format!("`{}`", n),
+                    _ => "`$`".to_string(),
+                };
+                return Err(Error::new(format!(
+                    "termination check: loop counter {} went from {} to {} instead of {}",
+                    name,
+                    old.to_display_string(),
+                    new.to_display_string(),
+                    if *up { "up" } else { "down" }
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn exec_stmt(&mut self, stmt: &Stmt) -> Result<Flow> {
         self.steps += 1;
         if self.out_of_steps() {
@@ -897,33 +1015,39 @@ impl Runtime {
                 }
             }
             Stmt::While { cond, body, .. } => {
+                let counters = self.loop_counters(cond, None, body);
                 let mut iterations = 0u64;
                 while self.eval(cond)?.as_bool()? {
                     iterations += 1;
                     if iterations > self.limits.max_loop_iterations {
                         return Err(Error::new("while loop exceeded the iteration limit"));
                     }
+                    let before = self.counter_values(&counters);
                     match self.exec_stmts(body)? {
                         Flow::Break => break,
                         Flow::Return(v) => return Ok(Flow::Return(v)),
                         _ => {}
                     }
+                    self.check_counters(&counters, &before)?;
                 }
             }
             Stmt::For { init, cond, update, body, .. } => {
                 self.exec_stmt(init)?;
+                let counters = self.loop_counters(cond, Some(update), body);
                 let mut iterations = 0u64;
                 while self.eval(cond)?.as_bool()? {
                     iterations += 1;
                     if iterations > self.limits.max_loop_iterations {
                         return Err(Error::new("for loop exceeded the iteration limit"));
                     }
+                    let before = self.counter_values(&counters);
                     match self.exec_stmts(body)? {
                         Flow::Break => break,
                         Flow::Return(v) => return Ok(Flow::Return(v)),
                         _ => {}
                     }
                     self.exec_stmt(update)?;
+                    self.check_counters(&counters, &before)?;
                 }
             }
             Stmt::Return { value, .. } => {
@@ -1357,6 +1481,16 @@ impl Runtime {
         Ok(())
     }
 
+    /// Evaluates the condition of a `[while(...)]` array. The condition may
+    /// look at the data but does not move the array's cursor: each entry
+    /// starts where the previous one ended.
+    fn array_condition(&mut self, cond: &Expr) -> Result<bool> {
+        let at = (self.cursor, self.current_section);
+        let r = self.eval(cond).and_then(|v| v.as_bool());
+        (self.cursor, self.current_section) = at;
+        r
+    }
+
     fn exec_padding(&mut self, size: &ArraySize, attrs: &[Attribute]) -> Result<()> {
         let start = self.cursor;
         let section = self.current_section;
@@ -1365,7 +1499,7 @@ impl Runtime {
             ArraySize::While(cond) => {
                 let mut n = 0u64;
                 loop {
-                    if !self.eval(cond)?.as_bool()? {
+                    if !self.array_condition(cond)? {
                         break;
                     }
                     if self.cursor >= self.section_len(section) {
@@ -1381,6 +1515,14 @@ impl Runtime {
         };
         if self.scope().kind == ScopeKind::Bitfield {
             return Err(Error::new("byte padding inside a bitfield"));
+        }
+        if self.limits.check_measures && start.checked_add(n).map(|end| end > self.cursor_bound(section)).unwrap_or(true) {
+            return Err(Error::new(format!(
+                "termination check: padding of {} byte(s) at 0x{:X} runs past the end of the data (0x{:X})",
+                n,
+                start,
+                self.cursor_bound(section)
+            )));
         }
         let p = Pattern::new("", "padding", start, n, section, self.default_endian, PatternKind::Padding).shared();
         p.borrow_mut().hidden = true;
@@ -1477,6 +1619,33 @@ impl Runtime {
                 if self.depth >= self.limits.max_recursion {
                     return Err(Error::new(format!("recursion limit reached creating `{}`", inst.display)));
                 }
+                let tracked = self.limits.check_measures && !matches!(decl.kind, TypeKind::Enum(_));
+                if tracked {
+                    // The same type with the same arguments at the same
+                    // offset inside itself would do the same again. This
+                    // also bounds the nesting: there are only so many
+                    // offsets.
+                    let key = (Rc::as_ptr(&decl) as usize, section, self.cursor);
+                    let repeat = self
+                        .instances
+                        .iter()
+                        .any(|i| (i.decl, i.section, i.offset) == key && bindings_key(&i.bindings) == bindings_key(&inst.bindings));
+                    if repeat {
+                        return Err(Error::new(format!(
+                            "termination check: `{}` is instantiated at 0x{:X} inside an instance of itself at the same offset",
+                            inst.display, self.cursor
+                        )));
+                    }
+                    if self.instances.iter().any(|i| (i.decl, i.section) == (key.0, key.1)) && self.cursor > self.cursor_bound(section) {
+                        return Err(Error::new(format!(
+                            "termination check: `{}` is instantiated inside itself at 0x{:X}, past the end of the data (0x{:X})",
+                            inst.display,
+                            self.cursor,
+                            self.cursor_bound(section)
+                        )));
+                    }
+                    self.instances.push(LiveInstance { decl: key.0, section: key.1, offset: key.2, bindings: inst.bindings.clone() });
+                }
                 self.depth += 1;
                 let r = match &decl.kind {
                     TypeKind::Struct(def) => self.create_struct(&decl, def.clone(), inst, name, endian, section, false),
@@ -1486,6 +1655,9 @@ impl Runtime {
                     TypeKind::Alias(..) | TypeKind::Forward => unreachable!("aliases are resolved by instantiate"),
                 };
                 self.depth -= 1;
+                if tracked {
+                    self.instances.pop();
+                }
                 r?
             }
         };
@@ -1501,13 +1673,27 @@ impl Runtime {
         Ok(p)
     }
 
+    /// The largest value the cursor can take in a section: the end of the
+    /// data, or for a heap section the size it may grow to.
+    fn cursor_bound(&self, section: usize) -> u64 {
+        let len = self.section_len(section);
+        if section == 0 {
+            len
+        } else {
+            len.max(Self::MAX_HEAP_SECTION)
+        }
+    }
+
+    /// Heap sections grow on demand up to this size.
+    const MAX_HEAP_SECTION: u64 = 16 << 20;
+
     fn check_bounds(&mut self, section: usize, offset: u64, size: u64) -> Result<()> {
         let len = self.section_len(section);
         if section != 0 && offset.checked_add(size).map(|end| end > len).unwrap_or(false) {
             // Heap sections grow on demand, like ImHex sections, within a
             // sanity limit so that a garbage length cannot allocate gigabytes.
             let end = offset + size;
-            if end <= (16u64 << 20) {
+            if end <= Self::MAX_HEAP_SECTION {
                 self.sections[section].resize(end as usize, 0);
                 return Ok(());
             }
@@ -1916,7 +2102,7 @@ impl Runtime {
                 ArraySize::While(cond) => {
                     count = 0;
                     loop {
-                        if !self.eval(cond)?.as_bool()? {
+                        if !self.array_condition(cond)? {
                             break;
                         }
                         if count >= self.limits.max_array_entries {
@@ -1966,7 +2152,7 @@ impl Runtime {
                     break;
                 }
             } else if let ArraySize::While(cond) = size {
-                if !self.eval(cond)?.as_bool()? {
+                if !self.array_condition(cond)? {
                     break;
                 }
             }
@@ -1977,6 +2163,7 @@ impl Runtime {
             self.scope_mut().array_index = Some(index);
             self.pending_break = false;
             self.pending_continue = false;
+            let entry_start = self.cursor;
             let r = self.create_pattern(inst, &format!("[{}]", index), endian, section);
             let broke = self.pending_break;
             let continued = self.pending_continue;
@@ -1984,7 +2171,29 @@ impl Runtime {
             self.pending_continue = false;
             self.pop_scope();
             let entry = r?;
+            // An array without a count ends because the cursor reaches the
+            // end of the data: an entry that does not end the array has to
+            // move the cursor forward.
+            let open_ended = count_limit.is_none();
+            if self.limits.check_measures && open_ended && self.cursor > self.cursor_bound(section) {
+                return Err(Error::new(format!(
+                    "termination check: entry {} of the array ends at 0x{:X}, past the end of the data (0x{:X})",
+                    index,
+                    self.cursor,
+                    self.cursor_bound(section)
+                )));
+            }
+            let stood_still = self.limits.check_measures && open_ended && self.cursor <= entry_start;
+            let no_progress = |index: u64| {
+                Error::new(format!(
+                    "termination check: entry {} of the array did not advance the cursor (0x{:X}); the array would not end",
+                    index, entry_start
+                ))
+            };
             if continued {
+                if stood_still {
+                    return Err(no_progress(index));
+                }
                 // Like the reference runtime: `continue` discards the entry
                 // and moves on (the bytes stay consumed).
                 index += 1;
@@ -2009,6 +2218,9 @@ impl Runtime {
             }
             if stop {
                 break;
+            }
+            if stood_still {
+                return Err(no_progress(index - 1));
             }
         }
         let size_bytes = self.cursor.saturating_sub(start);
@@ -2391,7 +2603,20 @@ impl Runtime {
     fn assign(&mut self, target: &LValue, value: Value) -> Result<()> {
         match target {
             LValue::Dollar => {
-                self.cursor = value.as_u64()?;
+                let to = value.as_u64()?;
+                if self.limits.check_measures {
+                    // With this, the cursor never passes the end: reads
+                    // past it fail as well. Progress of the cursor is then
+                    // a termination measure.
+                    let end = self.cursor_bound(self.current_section);
+                    if to > end {
+                        return Err(Error::new(format!(
+                            "termination check: `$` set to 0x{:X}, past the end of the data (0x{:X})",
+                            to, end
+                        )));
+                    }
+                }
+                self.cursor = to;
                 Ok(())
             }
             LValue::Ident(name) => {

@@ -29,6 +29,20 @@ fn proven(src: &str, argument: &str) {
     assert!(l.iter().any(|x| x.contains(argument)), "no `{}` in {:#?}\n{}", argument, l, src);
 }
 
+/// An obligation that the run-time measure checks decide.
+#[track_caller]
+fn decided(src: &str, reason: &str) {
+    let l = lines(src);
+    assert!(
+        l.iter().any(|x| x.contains("run-time check") && x.contains(reason)),
+        "no run-time check `{}` in {:#?}\n{}",
+        reason,
+        l,
+        src
+    );
+    assert!(!report(src).all_proven());
+}
+
 #[track_caller]
 fn open(src: &str, reason: &str) {
     let l = lines(src);
@@ -105,22 +119,24 @@ fn arrays_progress_through_the_data() {
 
 #[test]
 fn arrays_that_may_stand_still() {
-    open("struct E { }; E es[while(true)] @ 0;", "an entry can be empty");
+    decided("struct E { }; E es[while(true)] @ 0;", "an entry can be empty");
     // No arm may match.
-    open("struct E { u8 t = 1; if (t == 0) u8 a; else if (t == 2) u16 b; }; E es[while(true)] @ 0;", "an entry can be empty");
-    open("struct E { u8 t = 1; match (t) { (0): u8 a; } }; E es[while(true)] @ 0;", "an entry can be empty");
+    decided("struct E { u8 t = 1; if (t == 0) u8 a; else if (t == 2) u16 b; }; E es[while(true)] @ 0;", "an entry can be empty");
+    decided("struct E { u8 t = 1; match (t) { (0): u8 a; } }; E es[while(true)] @ 0;", "an entry can be empty");
     // `continue` drops the entry but the array goes on.
-    open("struct E { continue; u8 a; }; E es[while(true)] @ 0;", "an entry can be empty");
+    decided("struct E { continue; u8 a; }; E es[while(true)] @ 0;", "an entry can be empty");
     // A local, a placed member and a no_unique_address member read nothing.
-    open("struct E { u8 a = 1; u8 b @ 0; u8 c [[no_unique_address]]; }; E es[while(true)] @ 0;", "an entry can be empty");
+    decided("struct E { u8 a = 1; u8 b @ 0; u8 c [[no_unique_address]]; }; E es[while(true)] @ 0;", "an entry can be empty");
     // Peek and step back.
-    open("struct E { u8 a; $ -= 1; }; E es[while(true)] @ 0;", "may move the cursor back");
-    open("struct E { u8 a; $ = a; }; E es[while(true)] @ 0;", "may move the cursor back");
+    decided("struct E { u8 a; $ -= 1; }; E es[while(true)] @ 0;", "may move the cursor back");
+    // Every such array is still guarded: the interpreter checks each entry.
+    assert!(report("struct E { }; E es[while(true)] @ 0;").guarded());
+    decided("struct E { u8 a; $ = a; }; E es[while(true)] @ 0;", "may move the cursor back");
     // ... also when a function or a nested type does it.
-    open("fn back() { $ = 0; }; struct E { u8 a; back(); }; E es[while(true)] @ 0;", "may move the cursor back");
-    open("struct R { $ = 0; }; struct E { u8 a; R r; }; E es[while(true)] @ 0;", "may move the cursor back");
+    decided("fn back() { $ = 0; }; struct E { u8 a; back(); }; E es[while(true)] @ 0;", "may move the cursor back");
+    decided("struct R { $ = 0; }; struct E { u8 a; R r; }; E es[while(true)] @ 0;", "may move the cursor back");
     // try/catch restores the cursor when the body fails.
-    open("struct E { try { u8 a; } catch { } }; E es[while(true)] @ 0;", "an entry can be empty");
+    decided("struct E { try { u8 a; } catch { } }; E es[while(true)] @ 0;", "an entry can be empty");
 }
 
 #[test]
@@ -129,9 +145,9 @@ fn arrays_of_a_template_parameter() {
         "struct L<T> { T data[while(std::mem::read_unsigned($, 1) != 0)]; }; struct E { u16 x; }; L<char> a @ 0; L<E> b @ 0;",
         "for every type the template is used with",
     );
-    open("struct L<T> { T data[while(true)]; }; struct Z { }; L<u8> a @ 0; L<Z> b @ 0;", "with Z an entry can be empty");
+    decided("struct L<T> { T data[while(true)]; }; struct Z { }; L<u8> a @ 0; L<Z> b @ 0;", "with Z an entry can be empty");
     // The parameter is passed on through another template.
-    open(
+    decided(
         "struct L<T> { T data[while(true)]; }; struct W<T> { L<T> l; }; struct Z { }; W<Z> w @ 0;",
         "with Z an entry can be empty",
     );
@@ -165,14 +181,20 @@ fn inline_recursion_needs_a_byte_between_instances() {
          match (t) { (1): Leaf box; (_): Container box; } }; Box all[while(!std::mem::eof())] @ 0;",
         "each entry reads at least 8 byte(s)",
     );
-    open("struct S { S s; u8 a; }; S s @ 0;", "can reach itself without reading a byte first");
-    open("union U { u8 a; U u; }; U u @ 0;", "can reach itself without reading a byte first");
-    open("struct A : A { u8 x; }; A a @ 0;", "can reach itself without reading a byte first");
-    open("using B; using A = B; using B = A; A x @ 0;", "can reach itself without reading a byte first");
-    open("struct T<auto n> { T<n + 1> x; }; T<0> t @ 0;", "can reach itself without reading a byte first");
-    open("struct S { u8 a; $ = 0; S s; }; S s @ 0;", "may move the cursor back");
+    // Without a byte in between, the run-time check decides: an instance
+    // inside itself at the same offset is refused.
+    decided("struct S { S s; u8 a; }; S s @ 0;", "can reach itself without reading a byte first");
+    decided("union U { u8 a; U u; }; U u @ 0;", "can reach itself without reading a byte first");
+    decided("struct S { u8 a; $ = 0; S s; }; S s @ 0;", "may move the cursor back");
     // The recursion goes through a template argument.
-    open("struct W<T> { T inner; }; struct N { W<N> w; }; N n @ 0;", "can reach itself without reading a byte first");
+    decided("struct W<T> { T inner; }; struct N { W<N> w; }; N n @ 0;", "can reach itself without reading a byte first");
+    // Cycles that put no instance at the cursor are left to the depth limit.
+    open("struct A : A { u8 x; }; A a @ 0;", "inherits from itself or is an alias of itself");
+    open("using B; using A = B; using B = A; A x @ 0;", "inherits from itself or is an alias of itself");
+    open("struct T<auto n> { T<n + 1> x; }; T<0> t @ 0;", "a template argument is computed anew at each level");
+    open("struct S { u32 n = sizeof(S); }; S s @ 0;", "evaluates a type away from the cursor");
+    // A parent inside the cycle is fine when a member closes it.
+    decided("using Node; struct Base { Node child; }; struct Node : Base { u8 x; }; Node n @ 0;", "can reach itself without reading");
     proven("struct W<T> { u8 tag; if (tag == 1) T inner; }; struct N { W<N> w; }; N n @ 0;", "at least one byte is read");
 }
 
@@ -185,7 +207,8 @@ fn cycles_through_placements_need_a_run_time_check() {
     ] {
         let l = lines(src);
         assert!(l.iter().any(|x| x.contains("run-time check")), "{:#?}\n{}", l, src);
-        assert!(!report(src).all_proven());
+        let r = report(src);
+        assert!(!r.all_proven() && r.guarded());
     }
     // Without a cycle, placements and pointers need nothing: every jump goes
     // to a type further down.
@@ -200,6 +223,7 @@ fn recursive_functions_are_not_proven() {
     open("fn fmt(auto v) { return fmt(v); }; u8 a @ 0 [[format(\"fmt\")]];", "recursive function");
     // A function and a type that reach each other.
     open("fn g() { S s @ 0; }; struct S { u8 a; g(); }; S s @ 0;", "types and functions that reach each other");
+    assert!(!report("fn f(u32 x) { return f(x); }; u32 y = f(1);").guarded());
 }
 
 #[test]

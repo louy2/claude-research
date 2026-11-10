@@ -5,8 +5,9 @@
 
 Defaults: vendor/ImHex-Patterns/patterns and vendor/ImHex-Patterns/includes.
 Needs target/release/hexpat (cargo build --release -p hexpat). Prints how
-many patterns are fully proven, the obligations by verdict, and the reasons
-for the ones that are not proven.
+many patterns are fully proven, how many more are decided by the run-time
+measure checks, the obligations by verdict, and the reasons for the ones
+that are not proven statically.
 """
 import collections
 import os
@@ -41,10 +42,10 @@ def main():
     for name in names:
         r = subprocess.run([HEXPAT, "termination", os.path.join(PATTERNS, name), "-I", INCLUDES, "--all"],
                            capture_output=True, text=True, timeout=120)
-        if r.returncode not in (0, 2):
+        if r.returncode not in (0, 2, 3):
             failed.append((name, (r.stderr.strip().splitlines() or ["?"])[-1]))
             continue
-        status["proven" if r.returncode == 0 else "open"] += 1
+        status[{0: "proven", 3: "guarded", 2: "open"}[r.returncode]] += 1
         for line in r.stdout.splitlines():
             m = LINE.match(line)
             if not m:
@@ -54,8 +55,8 @@ def main():
             sites.add((m["file"] if "/" in m["file"] else name, m["line"], m["what"]))
             if m["tag"] != "proven":
                 reasons[(m["tag"], generalize(m["why"]))] += 1
-    print(f"{len(names)} patterns: {status['proven']} fully proven, {status['open']} with open obligations, "
-          f"{len(failed)} not analysed")
+    print(f"{len(names)} patterns: {status['proven']} fully proven, {status['guarded']} decided by run-time checks, "
+          f"{status['open']} with something not proven, {len(failed)} not analysed")
     total = sum(verdicts.values())
     print(f"{total} obligations ({len(sites)} distinct sites): {verdicts['proven']} proven, "
           f"{verdicts['run-time check']} need a run-time check, {verdicts['not proven']} not proven")

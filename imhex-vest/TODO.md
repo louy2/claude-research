@@ -52,7 +52,7 @@ against the nightly, 177 patterns):
 | vdf | `125:1: expected a non-negative value, got -1` |
 | veado | `9:1: cannot read 1 byte(s) at 0x12F6` (end of file) |
 | vhd | `in import fs/mbr: 52:1: unknown type MBR` |
-| xilinx_bootgen | `32:1: cannot read 4 byte(s) at 0x2FFFFFFFD` |
+| xilinx_bootgen | `36:1: termination check: … instantiated inside itself at 0x2FFFFFFFD, past the end of the data` (before the measure checks: `cannot read 4 byte(s) at 0x2FFFFFFFD`) |
 
 Several are reads at or past the end of the file that ImHex tolerates.
 How it does (PatternLanguage 300d738): main-section reads are not
@@ -113,7 +113,14 @@ First differing line, ImHex nightly vs hexpat:
 
 ### Termination
 
-Every evaluation now stops at a limit (`Limits`, `hexpat/tests/termination.rs`).
+Done: every evaluation stops at a limit; the measure checks stop a run
+where it goes wrong (`Limits`, `hexpat/tests/termination.rs`); the static
+check gives a verdict per loop, array and cycle (`hexpat termination`,
+`hexpat/src/termination.rs`, `scripts/termination-sweep.py`,
+`scripts/termination-fuzz.py`). On the 243 corpus patterns: 190 fully
+proven, 24 more decided by run-time checks, 29 with something not proven
+(37 obligations).
+
 Open:
 
 - [ ] `#pragma eval_depth`, `array_limit`, `pattern_limit` and `loop_limit`
@@ -125,36 +132,47 @@ Open:
 - [ ] The depth limit of 256 needs about 8 MiB of stack in a debug build
   (2 MiB in release). The CLI runs on a 1 GiB thread; library callers
   get whatever stack they run on.
-- [x] A static check that a pattern terminates on every input
-  (`hexpat termination`, `hexpat/src/termination.rs`,
-  `scripts/termination-sweep.py`). On the 243 corpus patterns: 189 fully
-  proven, 524 of 611 obligations.
-- [ ] Check the measures at run time, so that a verdict does not rest on
-  the two assumptions (counters do not wrap, reads past the end fail) and
-  so that the open cases get decided per input:
-  - every array entry and every loop round that relies on cursor progress
-    ends at a larger cursor than it started;
-  - a counter moved in its direction and did not wrap;
-  - for a cycle through a placement or a pointer, no (type, offset,
-    template arguments) repeats on the stack. 7 corpus patterns have such
-    a cycle: bplist, chd, dotnet_binaryformatter, pe, pyc, tiff and
-    xilinx_bootgen.
-- [ ] Zero-filling reads past the end (to match ImHex, see above) removes
-  the bound that cursor progress relies on for a type that contains
-  itself: ImHex only checks arrays against the end. Keep the end check for
-  nested instances, or bound them another way.
-- [ ] More arguments, by what the corpus needs (80 open obligations):
+- [ ] The measure checks refuse an array whose entries read nothing and
+  that ends because its condition counts them (ImHex accepts it). No
+  corpus fixture does this. If one turns up, let a counter in the
+  condition stand in for cursor progress.
+- [ ] Zero-filling reads past the end (to match ImHex, see above) keeps
+  arrays and nested instances bounded, because the measure checks compare
+  them with the end of the data. A `while` statement in a struct body that
+  is proven by cursor progress would lose its bound; give it the same end
+  check when that change is made.
+- [ ] Loops proven by a counter or by cursor progress rest on the static
+  argument alone (the run-time check only catches a wrapping counter).
+  Checking them per site needs a way to name a statement across the
+  analysis and the interpreter; lines repeat between files.
+- [ ] Outside the measures, left to the depth limit: template arguments
+  that take a new value at every level (`T<n + 1>`), and placements into
+  sections created along the way.
+- [ ] More arguments, by what the corpus needs (37 unproven obligations,
+  and 49 that are only decided at run time):
   - a cursor assignment that provably moves forward: `$ += n` with an
     unsigned `n`, `$ = start + size` where the entry already read `size`
-    (21 arrays, 5 cycles);
+    (20 arrays, 4 cycles);
   - an `if`/`match` chain over an enum that covers every value, so that an
     entry cannot be empty (part of the 17 "entry can be empty");
   - loops that shift or divide a value towards zero (`x >>= 1`,
     `x /= 1024`), and loops whose exit is a data-dependent scan
-    (29 loops);
-  - a decreasing argument for recursive functions (1 in the corpus).
+    (34 loops);
+  - a decreasing argument for recursive functions (1 in the corpus);
+  - a template argument that is computed but stays in a finite set (the
+    2 cycles in gvas and one using `std::ptr::NullablePtr`).
 - [ ] `import * from x as Name` (a whole pattern as a type) is not
   followed; the analysis reports the type as unknown.
+- [ ] Evaluation gets slower the deeper types nest. Found by
+  `scripts/termination-fuzz.py`: a 64 KiB bencode input nested about 250
+  deep took 18 s for 1 million steps, because every name lookup rebuilt
+  its candidate list once per enclosing scope. That is fixed (2.2 s); the
+  time still grows faster than the input, so other per-scope costs remain.
+- [ ] The depth limit counts type nesting and function calls together, so
+  an input nested close to 256 deep fails in whatever function is called
+  there (`recursion limit reached calling read_unsigned`). The measure
+  would allow the nesting; the limit is a cap on the stack. Consider a
+  separate, larger limit for type nesting.
 
 ### Other
 

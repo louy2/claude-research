@@ -97,10 +97,25 @@ Every evaluation stops. `Limits` (`hexpat/src/interp/mod.rs`) bounds the
 nesting of types and function calls (256), the statements executed plus
 patterns created (100 million), patterns (2 million), array entries
 (1 million) and iterations of one loop (50 million); a pattern that would
-run forever ends with an error instead. `hexpat/tests/termination.rs` holds
-the cases: pointer and placement cycles, self-inheriting types, alias
-cycles, nested loops, and `try`/`catch` around a failing recursion.
-`HEXPAT_STATS=1` prints the step count of a run.
+run forever ends with an error instead. `HEXPAT_STATS=1` prints the step
+count of a run; the heaviest corpus fixture uses 1.3 million.
+
+Before a limit is reached, the **measure checks** (`Limits::check_measures`,
+on by default) stop a run where it goes wrong:
+
+| check | error |
+|---|---|
+| an entry of a `[while(...)]` or `[]` array that does not end the array must end past where it started, inside the data | `entry 3 of the array did not advance the cursor` |
+| no type is instantiated inside an instance of itself (same template arguments) at the same offset | `` `Node` is instantiated at 0x40 inside an instance of itself at the same offset `` |
+| `$` is not set past the end of the data, and padding does not run past it | `` `$` set to 0x64, past the end of the data (0x4) `` |
+| a loop counter that the condition bounds moves in its direction in every round | `` loop counter `i` went from 255 to 0 instead of up `` |
+
+The condition of a `[while(...)]` array may look at the data but cannot move
+the array's cursor. These rules are stricter than ImHex in one known way: an
+array whose entries read nothing and that ends because its condition counts
+them is refused (`--no-measure-checks` turns the checks off). No corpus fixture
+is affected: 159 of 177 evaluate with or without the checks.
+`hexpat/tests/termination.rs` holds the cases for the limits and the checks.
 
 ### Static termination check
 
@@ -109,7 +124,9 @@ recursions end for a reason that can be read off the pattern, without
 running it (`hexpat/src/termination.rs`). It builds a graph of the types and
 functions reachable from the top level and gives a verdict for every
 `while`/`for` statement, every `[while(...)]` or `[]` array, and every
-cycle in the graph:
+cycle in the graph.
+
+**Proven**, by one of these arguments:
 
 | argument | what is checked |
 |---|---|
@@ -118,30 +135,44 @@ cycle in the graph:
 | progress in a cycle | among types that contain each other, every cycle has a member that is read after at least one byte of its parent |
 | no cycle | types that only reach other types need nothing; this is the rank argument of `interval-vest` |
 
-A cycle through a placement or a pointer has no static argument, because
-the target comes from the data; it is reported as needing a run-time check.
-Recursive functions and everything else are "not proven". The exit code is
-0 only if everything is proven and every name was resolved.
+**Run-time check**: there is no static argument, but a measure check
+decides the question for each input. This covers arrays whose entries may
+be empty or step back, and cycles of types through a placement or a pointer
+or without a byte between two instances.
+
+**Not proven**: only the limits end it. These are loops without a
+recognisable counter, recursive functions, and cycles that never put an
+instance at the cursor (`sizeof` of the type itself, inheritance or alias
+cycles, a template argument computed anew at every level).
+
+The exit code is 0 if everything is proven, 3 if the rest is decided by
+run-time checks, and 2 if something is not proven or a name was not resolved.
 
 ```console
 $ target/release/hexpat termination formats/png.hexpat --all
 png.hexpat:46: array `chunks` in Png: proven: each entry reads at least 12 byte(s)
 5 type(s) and 0 function(s) reachable; 1 obligation(s): 1 proven, 0 need a run-time check, 0 not proven
 $ scripts/termination-sweep.py     # the 243 patterns of ImHex-Patterns
-243 patterns: 189 fully proven, 54 with open obligations, 0 not analysed
-611 obligations (513 distinct sites): 524 proven, 7 need a run-time check, 80 not proven
+243 patterns: 190 fully proven, 24 decided by run-time checks, 29 with something not proven, 0 not analysed
+611 obligations (513 distinct sites): 525 proven, 49 need a run-time check, 37 not proven
 ```
 
 The ten patterns in `formats/` are all fully proven. In the corpus,
 57 of the 243 have nothing to prove (no loop, no unsized array, no cycle).
-The 80 open obligations are mostly arrays whose entries can be empty or
-step back (`$ -= 1` after a peek, `$ = start + size`) and loops whose exit
-depends on the data.
+The 37 unproven obligations are 34 loops whose exit depends on the data or
+on a value that is shifted or divided, one recursive function, and two
+cycles with a computed template argument.
 
-The verdicts are syntactic and rest on two assumptions that the interpreter
-does not check yet: counters do not wrap around, and a read past the end of
-the data is an error. `hexpat/tests/termination_analysis.rs` holds the
-cases.
+The static arguments hold for evaluation with the measure checks on: the
+checks keep the cursor inside the data, which bounds progress, and catch a
+counter that wraps. Two things are outside the measures and left to the
+depth limit: template arguments that take ever new values, and placements
+into sections created along the way. `hexpat/tests/termination_analysis.rs`
+holds the cases.
+
+`scripts/termination-fuzz.py` compares the verdicts with what happens: it
+evaluates each corpus pattern on mutated copies of its fixture and reports
+runs that end at a limit or not at all, with the pattern's verdict.
 
 ### JSON export
 
