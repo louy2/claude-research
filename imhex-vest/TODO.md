@@ -54,8 +54,14 @@ against the nightly, 177 patterns):
 | vhd | `in import fs/mbr: 52:1: unknown type MBR` |
 | xilinx_bootgen | `32:1: cannot read 4 byte(s) at 0x2FFFFFFFD` |
 
-Several are reads at or past the end of the file that ImHex tolerates;
-find out how (zero-fill, or stopping an array at the end).
+Several are reads at or past the end of the file that ImHex tolerates.
+How it does (PatternLanguage 300d738): main-section reads are not
+bounds-checked. The `format` CLI path does a short `fread` into a buffer
+that every reader zero-initializes, and `run` zero-fills explicitly. So
+a single value that ends past the end reads as zeros. The only end checks
+are on a placement's start offset (`<= size`) and on arrays ("Array
+expanded past end of the data"). Matching this means zero-filling scalar
+and struct-member reads but keeping the array checks.
 
 Both fail, but the nightly only because of its own crash, so these are
 ours to fix once it parses: `bencode` (read at end of file), `id3` (read
