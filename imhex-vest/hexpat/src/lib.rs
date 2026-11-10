@@ -15,6 +15,7 @@ pub mod interp;
 pub mod lower;
 pub mod preprocess;
 pub mod reader;
+pub mod termination;
 
 pub use error::{Error, Result};
 pub use interp::{Pattern, PatternKind, PatternRef, Runtime, Value};

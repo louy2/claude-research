@@ -194,7 +194,7 @@ impl Scope {
 pub type BuiltinFn = fn(&mut Runtime, Vec<Value>) -> Result<Value>;
 
 /// Types from the ImHex standard library that native builtins depend on.
-const PRELUDE: &str = r#"
+pub(crate) const PRELUDE: &str = r#"
 namespace std {
     namespace core {
         enum BitfieldOrder : u8 { LeftToRight = 0, RightToLeft = 1, MostToLeastSignificant = 0, LeastToMostSignificant = 1 };
@@ -1070,7 +1070,12 @@ impl Runtime {
         Ok(())
     }
 
-    fn resolve_import(&self, key: &str) -> Option<PathBuf> {
+    /// True if `name` (for example `std::mem::size`) is implemented natively.
+    pub(crate) fn has_builtin(&self, name: &str) -> bool {
+        self.builtins.contains_key(name)
+    }
+
+    pub(crate) fn resolve_import(&self, key: &str) -> Option<PathBuf> {
         let mut candidates = Vec::new();
         for inc in &self.include_paths {
             candidates.push(inc.join(format!("{}.pat", key)));

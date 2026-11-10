@@ -102,6 +102,47 @@ the cases: pointer and placement cycles, self-inheriting types, alias
 cycles, nested loops, and `try`/`catch` around a failing recursion.
 `HEXPAT_STATS=1` prints the step count of a run.
 
+### Static termination check
+
+`hexpat termination <pattern> [-I dir]... [--all]` asks which loops and
+recursions end for a reason that can be read off the pattern, without
+running it (`hexpat/src/termination.rs`). It builds a graph of the types and
+functions reachable from the top level and gives a verdict for every
+`while`/`for` statement, every `[while(...)]` or `[]` array, and every
+cycle in the graph:
+
+| argument | what is checked |
+|---|---|
+| counter | a variable (or `$`) moves by a constant step towards a bound; the loop does not assign the bound or call anything that could |
+| cursor progress | every entry or round reads at least one byte on every path, and nothing it runs moves the cursor back |
+| progress in a cycle | among types that contain each other, every cycle has a member that is read after at least one byte of its parent |
+| no cycle | types that only reach other types need nothing; this is the rank argument of `interval-vest` |
+
+A cycle through a placement or a pointer has no static argument, because
+the target comes from the data; it is reported as needing a run-time check.
+Recursive functions and everything else are "not proven". The exit code is
+0 only if everything is proven and every name was resolved.
+
+```console
+$ target/release/hexpat termination formats/png.hexpat --all
+png.hexpat:46: array `chunks` in Png: proven: each entry reads at least 12 byte(s)
+5 type(s) and 0 function(s) reachable; 1 obligation(s): 1 proven, 0 need a run-time check, 0 not proven
+$ scripts/termination-sweep.py     # the 243 patterns of ImHex-Patterns
+243 patterns: 189 fully proven, 54 with open obligations, 0 not analysed
+611 obligations (513 distinct sites): 524 proven, 7 need a run-time check, 80 not proven
+```
+
+The ten patterns in `formats/` are all fully proven. In the corpus,
+57 of the 243 have nothing to prove (no loop, no unsized array, no cycle).
+The 80 open obligations are mostly arrays whose entries can be empty or
+step back (`$ -= 1` after a peek, `$ = start + size`) and loops whose exit
+depends on the data.
+
+The verdicts are syntactic and rest on two assumptions that the interpreter
+does not check yet: counters do not wrap around, and a read past the end of
+the data is an error. `hexpat/tests/termination_analysis.rs` holds the
+cases.
+
 ### JSON export
 
 `hexpat run --json` and `hexpat format -f json` write the pattern tree in

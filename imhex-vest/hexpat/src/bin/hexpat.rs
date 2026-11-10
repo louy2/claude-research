@@ -18,7 +18,7 @@ use hexpat::interp::dump::DumpOptions;
 use hexpat::{Runtime, Value};
 
 fn usage() -> ExitCode {
-    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--inline-enums] [--root TYPE]");
+    eprintln!("usage:\n  hexpat parse <pattern> [-I dir]...\n  hexpat run <pattern> <data> [-I dir]... [--json [-m]] [--tree-json] [--format] [--hidden] [--max-entries N] [--in name=value]...\n  hexpat format -p <pattern> -i <data> [-I dir]... [-f json] [-m] [-o file]\n  hexpat emit-vest <pattern> [-I dir]... [-o file] [--root TYPE]\n  hexpat termination <pattern> [-I dir]... [--all]\n  hexpat emit-asn1 <pattern> [-I dir]... [-o dir] [--module NAME] [--max-len N] [--twos-complement] [--inline-enums] [--root TYPE]");
     ExitCode::from(2)
 }
 
@@ -42,6 +42,7 @@ struct Args {
     max_len: Option<u64>,
     twos_complement: bool,
     inline_enums: bool,
+    all: bool,
 }
 
 fn parse_args() -> Option<Args> {
@@ -65,6 +66,7 @@ fn parse_args() -> Option<Args> {
         max_len: None,
         twos_complement: false,
         inline_enums: false,
+        all: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -78,6 +80,7 @@ fn parse_args() -> Option<Args> {
             "-f" | "--formatter" => a.formatter = it.next()?,
             "--format" => a.format = true,
             "--hidden" => a.hidden = true,
+            "--all" => a.all = true,
             "--quiet" | "-q" => a.quiet = true,
             "--max-entries" => a.max_entries = it.next()?.parse().ok()?,
             "-o" | "--output" => a.output = Some(PathBuf::from(it.next()?)),
@@ -123,7 +126,55 @@ fn real_main() -> ExitCode {
         "format" => cmd_format(&args),
         "emit-vest" => cmd_emit(&args),
         "emit-asn1" => cmd_emit_asn1(&args),
+        "termination" => cmd_termination(&args),
         _ => usage(),
+    }
+}
+
+/// Prints the termination verdict of every loop, unsized array and cycle
+/// in a pattern. `--all` also lists the proven ones.
+fn cmd_termination(args: &Args) -> ExitCode {
+    use hexpat::termination::{analyze, Verdict};
+    let Some(pattern) = args.positional.get(1) else { return usage() };
+    let path = Path::new(pattern);
+    let source = match read_pattern(path) {
+        Ok(s) => s,
+        Err(c) => return c,
+    };
+    let report = match analyze(&source, path, &args.includes) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("{}: {}", path.display(), e);
+            return ExitCode::from(1);
+        }
+    };
+    for o in &report.obligations {
+        let (tag, why) = match &o.verdict {
+            Verdict::Proven(w) => ("proven", w),
+            Verdict::RuntimeCheck(w) => ("run-time check", w),
+            Verdict::NotProven(w) => ("not proven", w),
+        };
+        if args.all || tag != "proven" {
+            println!("{}:{}: {}: {}: {}", o.file, o.line, o.what, tag, why);
+        }
+    }
+    for n in &report.notes {
+        println!("note: {}", n);
+    }
+    let (proven, runtime, open) = report.count();
+    println!(
+        "{} type(s) and {} function(s) reachable; {} obligation(s): {} proven, {} need a run-time check, {} not proven",
+        report.reachable_types,
+        report.reachable_functions,
+        report.obligations.len(),
+        proven,
+        runtime,
+        open
+    );
+    if report.all_proven() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(2)
     }
 }
 

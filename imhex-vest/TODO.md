@@ -125,17 +125,36 @@ Open:
 - [ ] The depth limit of 256 needs about 8 MiB of stack in a debug build
   (2 MiB in release). The CLI runs on a 1 GiB thread; library callers
   get whatever stack they run on.
-- [ ] A static check that a pattern terminates on every input, with the
-  measure checked at run time:
-  - a call graph and a type graph (members, placements, pointers,
-    template arguments), collapsed into strongly connected components;
-  - for-loops with a counter the body does not assign;
-  - while-arrays and inline recursion where every step reads at least one
-    byte and nothing assigns `$`;
-  - placement and pointer recursion only when the type graph is acyclic
-    (the rank argument of interval-vest), otherwise a run-time check for a
-    repeated (type, offset, arguments) on the stack;
-  - everything else reported as "not proven" with its line.
+- [x] A static check that a pattern terminates on every input
+  (`hexpat termination`, `hexpat/src/termination.rs`,
+  `scripts/termination-sweep.py`). On the 243 corpus patterns: 189 fully
+  proven, 524 of 611 obligations.
+- [ ] Check the measures at run time, so that a verdict does not rest on
+  the two assumptions (counters do not wrap, reads past the end fail) and
+  so that the open cases get decided per input:
+  - every array entry and every loop round that relies on cursor progress
+    ends at a larger cursor than it started;
+  - a counter moved in its direction and did not wrap;
+  - for a cycle through a placement or a pointer, no (type, offset,
+    template arguments) repeats on the stack. 7 corpus patterns have such
+    a cycle: bplist, chd, dotnet_binaryformatter, pe, pyc, tiff and
+    xilinx_bootgen.
+- [ ] Zero-filling reads past the end (to match ImHex, see above) removes
+  the bound that cursor progress relies on for a type that contains
+  itself: ImHex only checks arrays against the end. Keep the end check for
+  nested instances, or bound them another way.
+- [ ] More arguments, by what the corpus needs (80 open obligations):
+  - a cursor assignment that provably moves forward: `$ += n` with an
+    unsigned `n`, `$ = start + size` where the entry already read `size`
+    (21 arrays, 5 cycles);
+  - an `if`/`match` chain over an enum that covers every value, so that an
+    entry cannot be empty (part of the 17 "entry can be empty");
+  - loops that shift or divide a value towards zero (`x >>= 1`,
+    `x /= 1024`), and loops whose exit is a data-dependent scan
+    (29 loops);
+  - a decreasing argument for recursive functions (1 in the corpus).
+- [ ] `import * from x as Name` (a whole pattern as a type) is not
+  followed; the analysis reports the type as unknown.
 
 ### Other
 
