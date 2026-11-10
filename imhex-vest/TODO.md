@@ -159,7 +159,7 @@ Open:
     `x /= 1024`), and loops whose exit is a data-dependent scan
     (34 loops);
   - a bound on an expression that grows with the counter (`$ + i < end`,
-    as in `ne` and `pe`);
+    as in `ne`);
   - a decreasing argument for recursive functions (1 in the corpus);
   - a template argument that is computed but stays in a finite set (the
     2 cycles in gvas and one using `std::ptr::NullablePtr`).
@@ -212,13 +212,16 @@ Not filed; drafts only.
   and two exit with an error.
 - [ ] **ImHex (both versions): `cpio_new_ascii` and `cpio_portable_ascii`
   abort in `Token::Literal::toString`.**
-- [ ] **ImHex-Patterns `ne.hexpat` and `pe.hexpat`: a `u8` loop counter
-  wraps.** `finddosmessage` and `findpointingcode` run
+- [ ] **ImHex-Patterns `ne.hexpat`: a `u8` loop counter wraps.**
+  `finddosmessage` and `findpointingcode` run
   `for (u8 i = 0, $+i < std::mem::read_unsigned(0x3C, 4), i = i + 1)`.
   When the header field is more than 255 past the cursor and the byte
   searched for is absent, `i` wraps to 0 and the loop never ends (ImHex
-  stops at its loop limit). Found by `scripts/termination-fuzz.py`; a
-  wider counter type fixes it.
+  stops at its loop limit). Found by `scripts/termination-fuzz.py` and
+  reproduced; a wider counter type fixes it.
+  - `pe.hexpat` has a related loop,
+    `for (u8 cursor = $, cursor < $+16, cursor += 1)`. By reading, it
+    cannot end when `$ + 16` is above 255; not reproduced.
 - [ ] **PatternLanguage: the redeclaration check skips `match` arms.**
   - Duplicates at struct level and inside `if` are rejected at
     compile time (`validator.cpp` descends into `if`, not `match`).

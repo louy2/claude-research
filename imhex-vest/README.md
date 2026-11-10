@@ -175,8 +175,8 @@ evaluates each corpus pattern on mutated copies of its fixture and reports
 runs that end at a limit or not at all, with the pattern's verdict. Over
 14,400 runs (80 per pattern, 180 patterns) no pattern that is proven or
 decided at run time reaches a limit. Along the way it found a loop in the
-`ne` pattern that never ends once its `u8` counter wraps (`pe` has the same
-loop); the counter check now stops it at the wrap.
+`ne` pattern that never ends once its `u8` counter wraps; the counter
+check now stops it at the wrap.
 
 ### JSON export
 
