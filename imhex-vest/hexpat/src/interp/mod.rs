@@ -271,7 +271,7 @@ pub struct Limits {
     ///   array ends at a larger cursor than it started at, inside the data;
     /// * no type is instantiated inside an instance of itself with the same
     ///   template arguments at the same offset, or past the end of the data;
-    /// * a loop counter that the condition bounds moves in its direction in
+    /// * a loop counter that the condition reads moves in its direction in
     ///   every round (it does not wrap around).
     ///
     /// These are the measures the static check (`crate::termination`)

@@ -96,7 +96,10 @@ def main():
             v = verdict(pattern)
             by_verdict[v] = by_verdict.get(v, 0) + 1
             seen = set()
+            timed_out = False
             for i in range(args.rounds):
+                if timed_out:
+                    break  # one slow run is enough; the rest would be slow too
                 with open(path, "wb") as f:
                     f.write(mutate(rng, data))
                 runs += 1
@@ -109,6 +112,7 @@ def main():
                         hit = f"killed by signal {-r.returncode}"
                 except subprocess.TimeoutExpired:
                     hit = f"no result after {args.timeout:g} s"
+                    timed_out = True
                 if hit and hit not in seen:
                     seen.add(hit)
                     hits += 1

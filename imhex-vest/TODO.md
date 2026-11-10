@@ -158,6 +158,8 @@ Open:
   - loops that shift or divide a value towards zero (`x >>= 1`,
     `x /= 1024`), and loops whose exit is a data-dependent scan
     (34 loops);
+  - a bound on an expression that grows with the counter (`$ + i < end`,
+    as in `ne` and `pe`);
   - a decreasing argument for recursive functions (1 in the corpus);
   - a template argument that is computed but stays in a finite set (the
     2 cycles in gvas and one using `std::ptr::NullablePtr`).
@@ -168,6 +170,9 @@ Open:
   deep took 18 s for 1 million steps, because every name lookup rebuilt
   its candidate list once per enclosing scope. That is fixed (2.2 s); the
   time still grows faster than the input, so other per-scope costs remain.
+- [ ] Reaching the step limit can take minutes: 100 million steps took
+  175 s in a loop that calls a library function each round. The heaviest
+  corpus fixture needs 1.3 million steps; consider a lower default.
 - [ ] The depth limit counts type nesting and function calls together, so
   an input nested close to 256 deep fails in whatever function is called
   there (`recursion limit reached calling read_unsigned`). The measure
@@ -207,6 +212,13 @@ Not filed; drafts only.
   and two exit with an error.
 - [ ] **ImHex (both versions): `cpio_new_ascii` and `cpio_portable_ascii`
   abort in `Token::Literal::toString`.**
+- [ ] **ImHex-Patterns `ne.hexpat` and `pe.hexpat`: a `u8` loop counter
+  wraps.** `finddosmessage` and `findpointingcode` run
+  `for (u8 i = 0, $+i < std::mem::read_unsigned(0x3C, 4), i = i + 1)`.
+  When the header field is more than 255 past the cursor and the byte
+  searched for is absent, `i` wraps to 0 and the loop never ends (ImHex
+  stops at its loop limit). Found by `scripts/termination-fuzz.py`; a
+  wider counter type fixes it.
 - [ ] **PatternLanguage: the redeclaration check skips `match` arms.**
   - Duplicates at struct level and inside `if` are rejected at
     compile time (`validator.cpp` descends into `if`, not `match`).

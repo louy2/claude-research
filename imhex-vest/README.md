@@ -108,7 +108,7 @@ on by default) stop a run where it goes wrong:
 | an entry of a `[while(...)]` or `[]` array that does not end the array must end past where it started, inside the data | `entry 3 of the array did not advance the cursor` |
 | no type is instantiated inside an instance of itself (same template arguments) at the same offset | `` `Node` is instantiated at 0x40 inside an instance of itself at the same offset `` |
 | `$` is not set past the end of the data, and padding does not run past it | `` `$` set to 0x64, past the end of the data (0x4) `` |
-| a loop counter that the condition bounds moves in its direction in every round | `` loop counter `i` went from 255 to 0 instead of up `` |
+| a loop counter that the condition reads moves in its direction in every round | `` loop counter `i` went from 255 to 0 instead of up `` |
 
 The condition of a `[while(...)]` array may look at the data but cannot move
 the array's cursor. These rules are stricter than ImHex in one known way: an
@@ -172,7 +172,11 @@ holds the cases.
 
 `scripts/termination-fuzz.py` compares the verdicts with what happens: it
 evaluates each corpus pattern on mutated copies of its fixture and reports
-runs that end at a limit or not at all, with the pattern's verdict.
+runs that end at a limit or not at all, with the pattern's verdict. Over
+14,400 runs (80 per pattern, 180 patterns) no pattern that is proven or
+decided at run time reaches a limit. Along the way it found a loop in the
+`ne` pattern that never ends once its `u8` counter wraps (`pe` has the same
+loop); the counter check now stops it at the wrap.
 
 ### JSON export
 

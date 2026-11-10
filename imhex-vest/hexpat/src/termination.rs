@@ -1587,14 +1587,23 @@ fn counter_bounds<'a>(cond: &'a Expr, counter: &LValue, up: bool) -> Vec<&'a Exp
     out
 }
 
-/// The counters of a loop that its condition bounds, with their direction
-/// (true: up). The static argument relies on each of them moving in every
-/// round; the interpreter checks at run time that they do, which catches a
-/// counter that wraps around.
+/// The counters of a loop that its condition reads, with their direction
+/// (true: up). The interpreter checks at run time that each of them moves
+/// in every round. One that does not has wrapped around, and a condition
+/// such as `i < n` or `$ + i < end` would then never turn false.
 pub(crate) fn loop_counters(cond: &Expr, update: Option<&Stmt>, body: &[Stmt]) -> Vec<(LValue, bool)> {
     counter_candidates(update, body)
         .into_iter()
-        .filter(|(c, up, _)| !counter_bounds(cond, c, *up).is_empty())
+        .filter(|(c, _, _)| {
+            let me = match c {
+                LValue::Ident(n) => Expr::Ident(n.clone()),
+                LValue::Dollar => Expr::Dollar,
+                LValue::Path(_) => return false,
+            };
+            let mut read = false;
+            for_each_expr(cond, &mut |x| read |= *x == me);
+            read
+        })
         .map(|(c, up, _)| (c, up))
         .collect()
 }

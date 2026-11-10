@@ -293,6 +293,13 @@ fn loop_counters_do_not_wrap() {
     );
     // Counters that stay in range are untouched.
     run_ok("u32 t = 0; for (u8 i = 0, i < 255, i += 1) { t += 1; } for (s8 j = 3, j >= 0, j -= 1) { t += 1; }", vec![0; 4]);
-    // A counter the condition does not bound is not watched.
+    // The condition need not compare the counter itself. This is the loop
+    // of the `ne` and `pe` patterns, which never ends once `i` wraps.
+    assert_stops(
+        "fn find() { for (u8 i = 0, $ + i < 1000, i = i + 1) { if (std::mem::read_unsigned(0, 1) == 0xBA) break; } }; find();",
+        checked,
+        "loop counter `i` went from 255 to 0 instead of up",
+    );
+    // A counter the condition does not read is not watched.
     run_ok("u32 t = 0; for (u8 i = 250, t < 10, i += 1) { t += 1; }", vec![0; 4]);
 }
