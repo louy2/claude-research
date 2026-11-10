@@ -145,14 +145,12 @@ Not filed; drafts only.
   - The evaluator's struct check (`ast_node_struct.cpp`) does not see
     arm members either: match/if push straight into the scope.
   - Lookup then takes the last declaration.
-- [ ] **ImHex-Patterns `gvas.hexpat`: duplicated members in legacy saves.**
-  - Arrays of structs in pre-UE5 saves give one `FPropertyTag` two
-    `propertyType` members (`FString`, then `type::Magic`), and two each
-    of `arrayIndex` and `terminator`.
-  - 216 tags in the test saves.
-  - Proposed fix: read the inner tag into its own struct (e.g.
-    `ArrayStructHeader inner;`) and use `inner.structName` and
-    `inner.size`. Not yet written or tested.
+- [x] **ImHex-Patterns `gvas.hexpat`: duplicated members in legacy saves.**
+  Arrays of structs in pre-UE5 saves gave one `FPropertyTag` two
+  `propertyType` members, and two each of `arrayIndex` and `terminator`
+  (216 tags in the test saves). The pattern's author has submitted a fix
+  upstream that reads the element tag as its own `FPropertyTag`, as their
+  `gvas` crate does.
 - [ ] **Polars 2.1 Parquet writer: the inline ColumnMetaData copy is
   unreferenced.** `file_offset` is set to
   `data_page_offset + total_compressed_size`, which misses the copy when
