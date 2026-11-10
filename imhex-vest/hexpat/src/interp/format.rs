@@ -17,6 +17,10 @@ struct Spec {
     plus: bool,
 }
 
+/// Widths and precisions above this are clamped, so that a format string
+/// cannot ask for gigabytes of padding.
+const MAX_FORMAT_WIDTH: usize = 4096;
+
 fn parse_spec(s: &str) -> Spec {
     let mut spec = Spec { fill: ' ', ..Default::default() };
     let chars: Vec<char> = s.chars().collect();
@@ -47,7 +51,7 @@ fn parse_spec(s: &str) -> Spec {
         i += 1;
     }
     if !w.is_empty() {
-        spec.width = w.parse().ok();
+        spec.width = w.parse().ok().map(|w: usize| w.min(MAX_FORMAT_WIDTH));
     }
     if i < chars.len() && chars[i] == '.' {
         i += 1;
@@ -56,7 +60,7 @@ fn parse_spec(s: &str) -> Spec {
             p.push(chars[i]);
             i += 1;
         }
-        spec.precision = p.parse().ok();
+        spec.precision = p.parse().ok().map(|p: usize| p.min(MAX_FORMAT_WIDTH));
     }
     if i < chars.len() {
         spec.kind = Some(chars[i]);

@@ -528,6 +528,17 @@ pub fn compare(l: &Value, r: &Value, op: BinaryOp) -> Result<bool> {
     })
 }
 
+/// The longest string that concatenation or repetition may build. Strings
+/// read from the data are bounded by the data instead.
+pub const MAX_BUILT_STRING: u128 = 64 << 20;
+
+fn check_string_len(len: u128) -> Result<()> {
+    if len > MAX_BUILT_STRING {
+        return Err(Error::new(format!("string of {} bytes exceeds the string size limit", len)));
+    }
+    Ok(())
+}
+
 fn binary(op: BinaryOp, l: Value, r: Value) -> Result<Value> {
     use BinaryOp::*;
     match op {
@@ -541,14 +552,17 @@ fn binary(op: BinaryOp, l: Value, r: Value) -> Result<Value> {
     match (&l, &r) {
         (Value::Str(a), _) if op == Add => {
             let b = r.as_str()?;
+            check_string_len(a.len() as u128 + b.len() as u128)?;
             return Ok(Value::Str(format!("{}{}", a, b)));
         }
         (_, Value::Str(b)) if op == Add => {
             let a = l.as_str()?;
+            check_string_len(a.len() as u128 + b.len() as u128)?;
             return Ok(Value::Str(format!("{}{}", a, b)));
         }
         (Value::Str(a), _) if op == Mul => {
             let n = r.as_u64()?;
+            check_string_len(a.len() as u128 * n as u128)?;
             return Ok(Value::Str(a.repeat(n as usize)));
         }
         (Value::Str(_), _) | (_, Value::Str(_)) => {

@@ -210,6 +210,9 @@ fn cmd_run(args: &Args) -> ExitCode {
         rt.set_in_variable(k, value);
     }
     let result = rt.run_source(&source, path.parent());
+    if std::env::var_os("HEXPAT_STATS").is_some() {
+        eprintln!("[stats] steps={}", rt.steps());
+    }
     let opts = DumpOptions { formatted: args.format, show_hidden: args.hidden, max_entries: args.max_entries };
     for line in &rt.console {
         emit(&format!("[out] {}\n", line));

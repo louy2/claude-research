@@ -216,18 +216,35 @@ namespace type {
 }
 "#;
 
-/// Execution limits to keep malformed inputs from running away.
+/// Execution limits to keep malformed inputs from running away. Together
+/// they bound every evaluation: `max_steps` bounds the number of statements
+/// executed, `max_patterns` the number of patterns created, and
+/// `max_recursion` the depth of the Rust stack.
 #[derive(Debug, Clone)]
 pub struct Limits {
     pub max_patterns: u64,
     pub max_array_entries: u64,
     pub max_loop_iterations: u64,
+    /// Nesting depth of function calls and of struct, union and bitfield
+    /// instantiations (including pointer and placement targets), counted
+    /// together.
     pub max_recursion: usize,
+    /// Statements executed plus patterns created in total, in pattern
+    /// bodies, functions and format functions. Per-loop limits multiply when
+    /// loops nest; this one does not. Once it is exceeded `try`/`catch` no
+    /// longer catches errors.
+    pub max_steps: u64,
 }
 
 impl Default for Limits {
     fn default() -> Self {
-        Limits { max_patterns: 2_000_000, max_array_entries: 1_000_000, max_loop_iterations: 50_000_000, max_recursion: 256 }
+        Limits {
+            max_patterns: 2_000_000,
+            max_array_entries: 1_000_000,
+            max_loop_iterations: 50_000_000,
+            max_recursion: 256,
+            max_steps: 100_000_000,
+        }
     }
 }
 
@@ -258,7 +275,10 @@ pub struct Runtime {
     env_vars: HashMap<String, Value>,
     in_vars: HashMap<String, Value>,
     pub out_vars: HashMap<String, Value>,
-    call_depth: usize,
+    /// Current nesting of function calls and type instantiations.
+    depth: usize,
+    /// Statements executed and patterns created so far.
+    steps: u64,
     /// Extra include-directory search for `import a.b` style paths.
     defines: HashMap<String, String>,
     /// Set when a `break` ran inside a struct body, so that an enclosing
@@ -298,7 +318,8 @@ impl Runtime {
             env_vars: HashMap::new(),
             in_vars: HashMap::new(),
             out_vars: HashMap::new(),
-            call_depth: 0,
+            depth: 0,
+            steps: 0,
             defines: HashMap::new(),
             pending_break: false,
             pending_continue: false,
@@ -692,7 +713,15 @@ impl Runtime {
                 scope.parent = cur.parent.clone();
                 scope.array_index = cur.array_index;
                 self.scopes.push(scope);
-                let r = self.instantiate(target);
+                // `using A = B; using B = A;` would resolve forever.
+                let r = if self.depth >= self.limits.max_recursion {
+                    Err(Error::new(format!("recursion limit reached resolving alias `{}`", decl.full_name)))
+                } else {
+                    self.depth += 1;
+                    let r = self.instantiate(target);
+                    self.depth -= 1;
+                    r
+                };
                 self.pop_scope();
                 let mut inst = r?;
                 if endian.is_some() {
@@ -771,7 +800,17 @@ impl Runtime {
         Ok(Flow::Normal)
     }
 
+    /// True once the step budget is used up. From then on every statement
+    /// fails and `try`/`catch` passes errors through.
+    fn out_of_steps(&self) -> bool {
+        self.steps > self.limits.max_steps
+    }
+
     fn exec_stmt(&mut self, stmt: &Stmt) -> Result<Flow> {
+        self.steps += 1;
+        if self.out_of_steps() {
+            return Err(Error::new("step limit exceeded"));
+        }
         if self.trace {
             eprintln!("[trace] {:>7}ms {:indent$}line {}", self.started.elapsed().as_millis(), "", stmt.line(), indent = self.scopes.len());
         }
@@ -850,6 +889,7 @@ impl Runtime {
                 let saved_cursor = self.cursor;
                 match self.exec_stmts(body) {
                     Ok(flow) => return Ok(flow),
+                    Err(e) if self.out_of_steps() => return Err(e),
                     Err(_) => {
                         self.cursor = saved_cursor;
                         return self.exec_stmts(handler);
@@ -1360,7 +1400,19 @@ impl Runtime {
     // Pattern creation
     // ------------------------------------------------------------------
 
+    /// Statements executed and patterns created so far (see
+    /// [`Limits::max_steps`]).
+    pub fn steps(&self) -> u64 {
+        self.steps
+    }
+
     fn count_pattern(&mut self) -> Result<()> {
+        // `sizeof` on a dynamic type restores `pattern_count`; the step count
+        // only grows.
+        self.steps += 1;
+        if self.out_of_steps() {
+            return Err(Error::new("step limit exceeded"));
+        }
         self.pattern_count += 1;
         if self.pattern_count > self.limits.max_patterns {
             return Err(Error::new("pattern limit exceeded"));
@@ -1415,13 +1467,21 @@ impl Runtime {
             InstanceBase::Builtin(b) => self.create_builtin(*b, name, endian, section)?,
             InstanceBase::Decl(decl) => {
                 let decl = decl.clone();
-                match &decl.kind {
-                    TypeKind::Struct(def) => self.create_struct(&decl, def.clone(), inst, name, endian, section, false)?,
-                    TypeKind::Union(def) => self.create_struct(&decl, def.clone(), inst, name, endian, section, true)?,
-                    TypeKind::Bitfield(def) => self.create_bitfield(&decl, def.clone(), inst, name, endian, section)?,
-                    TypeKind::Enum(def) => self.create_enum(&decl, def.clone(), name, endian, section)?,
-                    TypeKind::Alias(..) | TypeKind::Forward => unreachable!("aliases are resolved by instantiate"),
+                // A type that contains, points to or places itself nests one
+                // level per instance; the depth limit is what stops a cycle.
+                if self.depth >= self.limits.max_recursion {
+                    return Err(Error::new(format!("recursion limit reached creating `{}`", inst.display)));
                 }
+                self.depth += 1;
+                let r = match &decl.kind {
+                    TypeKind::Struct(def) => self.create_struct(&decl, def.clone(), inst, name, endian, section, false),
+                    TypeKind::Union(def) => self.create_struct(&decl, def.clone(), inst, name, endian, section, true),
+                    TypeKind::Bitfield(def) => self.create_bitfield(&decl, def.clone(), inst, name, endian, section),
+                    TypeKind::Enum(def) => self.create_enum(&decl, def.clone(), name, endian, section),
+                    TypeKind::Alias(..) | TypeKind::Forward => unreachable!("aliases are resolved by instantiate"),
+                };
+                self.depth -= 1;
+                r?
             }
         };
         self.assign_color(&p);
@@ -1649,9 +1709,16 @@ impl Runtime {
                     }
                 }
             }
+            // `struct A : A` would inherit forever.
+            if self.depth >= self.limits.max_recursion {
+                return Err(Error::new(format!("recursion limit reached inheriting from `{}`", pdecl.full_name)));
+            }
             let saved_ns = std::mem::replace(&mut self.scope_mut().namespace, pdecl.namespace.clone());
-            let flow = self.exec_struct_body(&pdef)?;
+            self.depth += 1;
+            let flow = self.exec_struct_body(&pdef);
+            self.depth -= 1;
             self.scope_mut().namespace = saved_ns;
+            let flow = flow?;
             if !matches!(flow, Flow::Normal) {
                 return Ok(flow);
             }
@@ -2392,7 +2459,7 @@ impl Runtime {
     }
 
     fn call_user_function(&mut self, f: &Rc<FunctionDef>, args: Vec<Value>) -> Result<Value> {
-        if self.call_depth >= self.limits.max_recursion {
+        if self.depth >= self.limits.max_recursion {
             return Err(Error::new(format!("recursion limit reached calling `{}`", f.name)));
         }
         let min_args = f.params.iter().filter(|p| p.default.is_none()).count();
@@ -2459,9 +2526,9 @@ impl Runtime {
             self.pop_scope();
             return Err(e);
         }
-        self.call_depth += 1;
+        self.depth += 1;
         let r = self.exec_stmts(&f.body);
-        self.call_depth -= 1;
+        self.depth -= 1;
         self.pop_scope();
         match r? {
             Flow::Return(v) => Ok(v),

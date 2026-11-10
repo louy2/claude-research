@@ -111,6 +111,32 @@ First differing line, ImHex nightly vs hexpat:
 - [ ] **Trailing commas** after the last entry: `btrfs_send_stream`,
   `pcapng`, `q3demo`.
 
+### Termination
+
+Every evaluation now stops at a limit (`Limits`, `hexpat/tests/termination.rs`).
+Open:
+
+- [ ] `#pragma eval_depth`, `array_limit`, `pattern_limit` and `loop_limit`
+  are ignored. ImHex's defaults are lower than ours (depth 32, arrays
+  0x10000, patterns 0x100000, loops 0x1000), and `0` turns a limit off
+  there. Decide whether a pragma may raise our limits, and up to where.
+- [ ] Memory is bounded only loosely: built strings stop at 64 MiB each
+  and heap sections at 16 MiB each, but nothing bounds how many are alive.
+- [ ] The depth limit of 256 needs about 8 MiB of stack in a debug build
+  (2 MiB in release). The CLI runs on a 1 GiB thread; library callers
+  get whatever stack they run on.
+- [ ] A static check that a pattern terminates on every input, with the
+  measure checked at run time:
+  - a call graph and a type graph (members, placements, pointers,
+    template arguments), collapsed into strongly connected components;
+  - for-loops with a counter the body does not assign;
+  - while-arrays and inline recursion where every step reads at least one
+    byte and nothing assigns `$`;
+  - placement and pointer recursion only when the type graph is acyclic
+    (the rank argument of interval-vest), otherwise a run-time check for a
+    repeated (type, offset, arguments) on the stack;
+  - everything else reported as "not proven" with its line.
+
 ### Other
 
 - [ ] ImHex 1.38.1 aborts on the pattern in `hexpat/tests/json.rs`

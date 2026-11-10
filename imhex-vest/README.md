@@ -93,6 +93,15 @@ $ target/release/hexpat parse pattern.hexpat                            # syntax
 for `in` variables, `--hidden`, `--max-entries N`, and `HEXPAT_TRACE=1`
 prints every statement and pattern creation.
 
+Every evaluation stops. `Limits` (`hexpat/src/interp/mod.rs`) bounds the
+nesting of types and function calls (256), the statements executed plus
+patterns created (100 million), patterns (2 million), array entries
+(1 million) and iterations of one loop (50 million); a pattern that would
+run forever ends with an error instead. `hexpat/tests/termination.rs` holds
+the cases: pointer and placement cycles, self-inheriting types, alias
+cycles, nested loops, and `try`/`catch` around a failing recursion.
+`HEXPAT_STATS=1` prints the step count of a run.
+
 ### JSON export
 
 `hexpat run --json` and `hexpat format -f json` write the pattern tree in
